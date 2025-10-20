@@ -90,6 +90,7 @@ awa_location = Path("aw-watcher-afk")
 aww_location = Path("aw-watcher-window")
 awi_location = Path("aw-watcher-input")
 aw_notify_location = Path("aw-notify")
+aw_export_daily_report_location = Path("aw-export-daily-report")
 
 if platform.system() == "Darwin":
     icon = aw_qt_location / "media/logo/logo.icns"
@@ -145,6 +146,9 @@ aw_watcher_afk_a = build_analysis(
         "pynput.mouse._win32",
         "pynput.keyboard._darwin",
         "pynput.mouse._darwin",
+        "Quartz",
+        "Cocoa",
+        "objc",
     ],
 )
 aw_watcher_input_a = build_analysis("aw_watcher_input", awi_location)
@@ -168,6 +172,14 @@ aw_watcher_window_a = build_analysis(
 aw_notify_a = build_analysis(
     "aw_notify", aw_notify_location, hiddenimports=["desktop_notifier.resources"]
 )
+aw_export_daily_report_a = build_analysis(
+    "aw_export_daily_report", 
+    aw_export_daily_report_location,
+    datas=[
+        (aw_export_daily_report_location / "web", "aw_export_daily_report/web"),
+        (aw_export_daily_report_location / "config", "aw_export_daily_report/config"),
+    ],
+)
 
 # https://pythonhosted.org/PyInstaller/spec-files.html#multipackage-bundles
 # MERGE takes a bit weird arguments, it wants tuples which consists of
@@ -179,6 +191,7 @@ MERGE(
     (aw_watcher_window_a, "aw-watcher-window", "aw-watcher-window"),
     (aw_watcher_input_a, "aw-watcher-input", "aw-watcher-input"),
     (aw_notify_a, "aw-notify", "aw-notify"),
+    (aw_export_daily_report_a, "aw-export-daily-report", "aw-export-daily-report"),
 )
 
 
@@ -202,6 +215,7 @@ awq_coll = build_collect(
 awi_coll = build_collect(aw_watcher_input_a, "aw-watcher-input")
 
 aw_notify_coll = build_collect(aw_notify_a, "aw-notify")
+aw_export_daily_report_coll = build_collect(aw_export_daily_report_a, "aw-export-daily-report")
 
 if platform.system() == "Darwin":
     app = BUNDLE(
@@ -211,6 +225,7 @@ if platform.system() == "Darwin":
         awa_coll,
         awi_coll,
         aw_notify_coll,
+        aw_export_daily_report_coll,
         name="ActivityWatch.app",
         icon=icon,
         bundle_identifier="net.activitywatch.ActivityWatch",

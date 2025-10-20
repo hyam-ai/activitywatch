@@ -24,3 +24,4 @@ __pycache__
 # MCP/Tool directories
 .playwright-mcp/
 .serena/
+aw-export-daily-report/analysis/*.json

@@ -11,7 +11,7 @@
 
 SHELL := /usr/bin/env bash
 
-SUBMODULES := aw-core aw-client aw-qt aw-server aw-server-rust aw-watcher-afk aw-watcher-window
+SUBMODULES := aw-core aw-client aw-qt aw-server aw-server-rust aw-watcher-afk aw-watcher-window aw-export-daily-report
 
 # Exclude aw-server-rust if SKIP_SERVER_RUST is true
 ifeq ($(SKIP_SERVER_RUST),true)
@@ -43,7 +43,7 @@ TYPECHECKABLES := $(foreach dir,$(SUBMODULES),$(call has_target,$(dir),typecheck
 build: aw-core/.git
 #	needed due to https://github.com/pypa/setuptools/issues/1963
 #	would ordinarily be specified in pyproject.toml, but is not respected due to https://github.com/pypa/setuptools/issues/1963
-	python3 -m pip install 'setuptools>49.1.1' --user
+	python3 -m pip install 'setuptools>49.1.1'
 	@if [ "$(SKIP_SERVER_RUST)" = "false" ]; then \
 		if (which cargo); then \
 			echo 'Rust found!'; \
@@ -60,7 +60,7 @@ build: aw-core/.git
 	make --directory=aw-client build
 	make --directory=aw-core build
 #	Needed to ensure that the server has the correct version set
-	python -c "import aw_server; print(aw_server.__version__)"
+	cd aw-server && poetry run python -c "import aw_server; print(aw_server.__version__)"
 
 
 # Install

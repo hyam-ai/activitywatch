@@ -13,8 +13,9 @@ python = "^3.9"
 aw-client = "^0.5.14"
 aw-core = "^0.5.17"
 click = "*"
-flask = "*"
+flask = "~2.2.5"
 flask-cors = "*"
+werkzeug = "^2.3.3,<3.0"
 python-dotenv = "^1.1.1"
 
 [tool.poetry.dev-dependencies]
