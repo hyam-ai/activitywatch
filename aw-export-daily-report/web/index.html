@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Activity Review – HY.AM STUDIOS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navigation">
+        <div class="nav-content">
+            <div class="logo">ACTIVITY REVIEW</div>
+            <img src="/static/hyam-logo-light.png" alt="HY.AM" class="nav-logo" id="navLogo">
+            <div class="nav-right">
+                <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+                    <span class="theme-icon">☀</span>
+                </button>
+                <div class="nav-date" id="reviewDate"></div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="container-primary">
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <h1 class="heading-hero">DAILY ACTIVITY</h1>
+            <div class="hero-meta">
+                <div class="total-time" id="totalTime">0h 0m</div>
+            </div>
+            <div class="hero-subtitle">
+                <p class="text-body">Review and submit your work activities</p>
+            </div>
+        </section>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="loading-state">
+            <p class="text-body">[ Loading activity data... ]</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="error-state" style="display: none;">
+            <p class="text-body">[ Error loading data ]</p>
+            <p class="text-body error-message" id="errorMessage"></p>
+
+            <!-- Date Picker for Manual Selection -->
+            <div class="date-picker-container">
+                <p class="text-body">Select a different date:</p>
+                <input type="date" id="datePicker" class="date-picker">
+                <button id="loadDateBtn" class="button-primary">[ Load Date ]</button>
+            </div>
+        </div>
+
+        <!-- Timeline Container -->
+        <div id="timelineContainer" class="timeline-container" style="display: none;">
+            <!-- Timeline table will be dynamically inserted here -->
+        </div>
+
+        <!-- Action Bar -->
+        <div id="actionBar" class="action-bar" style="display: none;">
+            <div class="action-summary">
+                <p class="text-body">Selected: <span id="selectedTime">0h 0m</span></p>
+                <p class="text-body">Activities: <span id="selectedCount">0</span></p>
+            </div>
+            <div class="action-buttons">
+                <button class="button-secondary" id="selectAllBtn">[ Select All ]</button>
+                <button class="button-secondary" id="deselectAllBtn">[ Deselect All ]</button>
+                <button class="button-primary" id="submitBtn">[ Submit ]</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Submit Confirmation Modal -->
+    <div id="submitModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2 class="heading-secondary">CONFIRM<br>SUBMISSION</h2>
+            <p class="text-body modal-text">
+                You are about to submit <span id="modalSelectedCount">0</span> activities
+                with a total time of <span id="modalSelectedTime">0h 0m</span>.
+            </p>
+            <div class="modal-buttons">
+                <button class="button-secondary" id="cancelSubmitBtn">[ Cancel ]</button>
+                <button class="button-primary" id="confirmSubmitBtn">[ Confirm ]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2 class="heading-secondary">SUCCESS</h2>
+            <p class="text-body modal-text">
+                Your activity report has been submitted successfully.
+            </p>
+            <div class="modal-buttons">
+                <button class="button-primary" id="closeSuccessBtn">[ Close ]</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

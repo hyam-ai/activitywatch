@@ -1,0 +1,299 @@
+{
+  "metadata": {
+    "email": "alican@hyam.de",
+    "date": "2025-10-17",
+    "timezone": "Europe/Berlin"
+  },
+  "timeline": [
+    {
+      "activity": "Timely - Hours (Google Chrome)",
+      "start_time_berlin": "2025-10-17T10:15:00.000+02:00",
+      "end_time_berlin": "2025-10-17T10:45:00.000+02:00",
+      "duration_seconds": 1800,
+      "sub_tasks": [
+        {
+          "app": "Daily Activity Review – HY.AM STUDIOS (Google Chrome)",
+          "title": "Daily Activity Review – HY.AM STUDIOS",
+          "start_time_berlin": "2025-10-17T10:17:59.000+02:00",
+          "end_time_berlin": "2025-10-17T10:30:30.000+02:00",
+          "duration_seconds": 378
+        },
+        {
+          "app": "activitywatch (Cursor)",
+          "title": "node — activitywatch",
+          "start_time_berlin": "2025-10-17T10:16:50.000+02:00",
+          "end_time_berlin": "2025-10-17T10:46:00.000+02:00",
+          "duration_seconds": 192
+        },
+        {
+          "app": "ActivityWatch (Google Chrome)",
+          "title": "ActivityWatch",
+          "start_time_berlin": "2025-10-17T10:38:50.000+02:00",
+          "end_time_berlin": "2025-10-17T10:42:40.000+02:00",
+          "duration_seconds": 107
+        },
+        {
+          "app": "Terminal",
+          "title": "alicanipek — -zsh — 80×24",
+          "start_time_berlin": "2025-10-17T10:39:10.000+02:00",
+          "end_time_berlin": "2025-10-17T10:40:26.000+02:00",
+          "duration_seconds": 76
+        }
+      ]
+    },
+    {
+      "activity": "activitywatch (Cursor)",
+      "start_time_berlin": "2025-10-17T10:45:00.000+02:00",
+      "end_time_berlin": "2025-10-17T11:00:00.000+02:00",
+      "duration_seconds": 181,
+      "sub_tasks": []
+    },
+    {
+      "activity": "Slack",
+      "start_time_berlin": "2025-10-17T11:00:00.000+02:00",
+      "end_time_berlin": "2025-10-17T11:15:00.000+02:00",
+      "duration_seconds": 616,
+      "sub_tasks": [
+        {
+          "app": "activitywatch (Cursor)",
+          "title": "node — activitywatch",
+          "start_time_berlin": "2025-10-17T11:05:02.000+02:00",
+          "end_time_berlin": "2025-10-17T11:16:23.000+02:00",
+          "duration_seconds": 215
+        }
+      ]
+    },
+    {
+      "activity": "activitywatch (Cursor)",
+      "start_time_berlin": "2025-10-17T11:15:00.000+02:00",
+      "end_time_berlin": "2025-10-17T13:15:00.000+02:00",
+      "duration_seconds": 7200,
+      "sub_tasks": [
+        {
+          "app": "Timely - Hours (Google Chrome)",
+          "title": "Hours - Timely",
+          "start_time_berlin": "2025-10-17T11:17:05.000+02:00",
+          "end_time_berlin": "2025-10-17T11:41:40.000+02:00",
+          "duration_seconds": 448
+        },
+        {
+          "app": "Slack",
+          "title": "Izzat (DM) - HY.AM - 4 new items - Slack",
+          "start_time_berlin": "2025-10-17T11:16:24.000+02:00",
+          "end_time_berlin": "2025-10-17T12:27:36.000+02:00",
+          "duration_seconds": 313
+        },
+        {
+          "app": "ActivityWatch (Google Chrome)",
+          "title": "ActivityWatch",
+          "start_time_berlin": "2025-10-17T11:45:00.000+02:00",
+          "end_time_berlin": "2025-10-17T12:44:10.000+02:00",
+          "duration_seconds": 268
+        },
+        {
+          "app": "Monospace Font Types – Figma (Google Chrome)",
+          "title": "Monospace Font Types – Figma",
+          "start_time_berlin": "2025-10-17T11:55:00.000+02:00",
+          "end_time_berlin": "2025-10-17T12:22:12.000+02:00",
+          "duration_seconds": 253
+        },
+        {
+          "app": "Daily Activity Review – HY.AM STUDIOS (Google Chrome)",
+          "title": "Daily Activity Review – HY.AM STUDIOS",
+          "start_time_berlin": "2025-10-17T11:45:25.000+02:00",
+          "end_time_berlin": "2025-10-17T11:50:08.000+02:00",
+          "duration_seconds": 136
+        },
+        {
+          "app": "Asana (Google Chrome)",
+          "title": "Asana",
+          "start_time_berlin": "2025-10-17T12:44:20.000+02:00",
+          "end_time_berlin": "2025-10-17T12:57:28.000+02:00",
+          "duration_seconds": 71
+        },
+        {
+          "app": "HYAM MindMap – FigJam (Google Chrome)",
+          "title": "HYAM MindMap – FigJam",
+          "start_time_berlin": "2025-10-17T11:53:20.000+02:00",
+          "end_time_berlin": "2025-10-17T12:24:16.000+02:00",
+          "duration_seconds": 70
+        }
+      ]
+    },
+    {
+      "activity": "activitywatch (Cursor)",
+      "start_time_berlin": "2025-10-17T14:00:00.000+02:00",
+      "end_time_berlin": "2025-10-17T15:15:00.000+02:00",
+      "duration_seconds": 4500,
+      "sub_tasks": [
+        {
+          "app": "Daily Activity Review – HY.AM STUDIOS (Google Chrome)",
+          "title": "Daily Activity Review – HY.AM STUDIOS",
+          "start_time_berlin": "2025-10-17T14:40:09.000+02:00",
+          "end_time_berlin": "2025-10-17T15:14:11.000+02:00",
+          "duration_seconds": 325
+        },
+        {
+          "app": "Timely - Hours (Google Chrome)",
+          "title": "Hours - Timely",
+          "start_time_berlin": "2025-10-17T14:10:16.000+02:00",
+          "end_time_berlin": "2025-10-17T14:28:00.000+02:00",
+          "duration_seconds": 272
+        },
+        {
+          "app": "Claude",
+          "title": "Claude",
+          "start_time_berlin": "2025-10-17T14:17:30.000+02:00",
+          "end_time_berlin": "2025-10-17T14:20:24.000+02:00",
+          "duration_seconds": 166
+        },
+        {
+          "app": "Slack Developer Docs - Sending messages using incoming webhooks (Google Chrome)",
+          "title": "Sending messages using incoming webhooks | Slack Developer Docs",
+          "start_time_berlin": "2025-10-17T14:28:23.000+02:00",
+          "end_time_berlin": "2025-10-17T14:30:12.000+02:00",
+          "duration_seconds": 110
+        }
+      ]
+    },
+    {
+      "activity": "Daily Activity Review – HY.AM STUDIOS (Google Chrome)",
+      "start_time_berlin": "2025-10-17T15:15:00.000+02:00",
+      "end_time_berlin": "2025-10-17T15:30:00.000+02:00",
+      "duration_seconds": 779,
+      "sub_tasks": [
+        {
+          "app": "activitywatch (Cursor)",
+          "title": "ASANA — activitywatch",
+          "start_time_berlin": "2025-10-17T15:16:03.000+02:00",
+          "end_time_berlin": "2025-10-17T15:25:58.000+02:00",
+          "duration_seconds": 141
+        }
+      ]
+    },
+    {
+      "activity": "activitywatch (Cursor)",
+      "start_time_berlin": "2025-10-17T15:30:00.000+02:00",
+      "end_time_berlin": "2025-10-17T15:45:00.000+02:00",
+      "duration_seconds": 623,
+      "sub_tasks": [
+        {
+          "app": "Daily Activity Review – HY.AM STUDIOS (Google Chrome)",
+          "title": "Daily Activity Review – HY.AM STUDIOS",
+          "start_time_berlin": "2025-10-17T15:25:58.000+02:00",
+          "end_time_berlin": "2025-10-17T15:38:31.000+02:00",
+          "duration_seconds": 133
+        }
+      ]
+    },
+    {
+      "activity": "Daily Activity Review – HY.AM STUDIOS (Google Chrome)",
+      "start_time_berlin": "2025-10-17T15:45:00.000+02:00",
+      "end_time_berlin": "2025-10-17T16:00:00.000+02:00",
+      "duration_seconds": 693,
+      "sub_tasks": [
+        {
+          "app": "activitywatch (Cursor)",
+          "title": "export_20251017_154117.json — activitywatch",
+          "start_time_berlin": "2025-10-17T15:54:12.000+02:00",
+          "end_time_berlin": "2025-10-17T16:01:48.000+02:00",
+          "duration_seconds": 177
+        },
+        {
+          "app": "Everhour - Time Tracking (Google Chrome)",
+          "title": "Time Tracking - Everhour",
+          "start_time_berlin": "2025-10-17T15:50:26.000+02:00",
+          "end_time_berlin": "2025-10-17T15:52:08.000+02:00",
+          "duration_seconds": 98
+        },
+        {
+          "app": "Claude",
+          "title": "Claude",
+          "start_time_berlin": "2025-10-17T15:52:51.000+02:00",
+          "end_time_berlin": "2025-10-17T15:54:12.000+02:00",
+          "duration_seconds": 74
+        }
+      ]
+    },
+    {
+      "activity": "activitywatch (Cursor)",
+      "start_time_berlin": "2025-10-17T16:00:00.000+02:00",
+      "end_time_berlin": "2025-10-17T17:30:00.000+02:00",
+      "duration_seconds": 5400,
+      "sub_tasks": [
+        {
+          "app": "Daily Activity Review – HY.AM STUDIOS (Google Chrome)",
+          "title": "Daily Activity Review – HY.AM STUDIOS",
+          "start_time_berlin": "2025-10-17T16:09:30.000+02:00",
+          "end_time_berlin": "2025-10-17T17:31:02.000+02:00",
+          "duration_seconds": 801
+        },
+        {
+          "app": "ActivityWatch (Google Chrome)",
+          "title": "ActivityWatch",
+          "start_time_berlin": "2025-10-17T16:03:03.000+02:00",
+          "end_time_berlin": "2025-10-17T17:10:17.000+02:00",
+          "duration_seconds": 181
+        },
+        {
+          "app": "Everhour - Time Tracking (Google Chrome)",
+          "title": "Time Tracking - Everhour",
+          "start_time_berlin": "2025-10-17T16:02:52.000+02:00",
+          "end_time_berlin": "2025-10-17T16:05:04.000+02:00",
+          "duration_seconds": 60
+        }
+      ]
+    },
+    {
+      "activity": "Daily Activity Review – HY.AM STUDIOS (Google Chrome)",
+      "start_time_berlin": "2025-10-17T17:30:00.000+02:00",
+      "end_time_berlin": "2025-10-17T18:00:00.000+02:00",
+      "duration_seconds": 1800,
+      "sub_tasks": [
+        {
+          "app": "activitywatch (Cursor)",
+          "title": "export_20251017_175040.json — activitywatch",
+          "start_time_berlin": "2025-10-17T17:31:02.000+02:00",
+          "end_time_berlin": "2025-10-17T17:57:28.000+02:00",
+          "duration_seconds": 447
+        },
+        {
+          "app": "Slack",
+          "title": "Time Tracker (DM) - HY.AM - 3 new items - Slack",
+          "start_time_berlin": "2025-10-17T17:32:54.000+02:00",
+          "end_time_berlin": "2025-10-17T17:37:37.000+02:00",
+          "duration_seconds": 240
+        },
+        {
+          "app": "Everhour - Time Tracking (Google Chrome)",
+          "title": "Time Tracking - Everhour",
+          "start_time_berlin": "2025-10-17T17:35:37.000+02:00",
+          "end_time_berlin": "2025-10-17T18:00:32.000+02:00",
+          "duration_seconds": 167
+        }
+      ]
+    },
+    {
+      "activity": "Everhour - Time Tracking (Google Chrome)",
+      "start_time_berlin": "2025-10-17T18:00:00.000+02:00",
+      "end_time_berlin": "2025-10-17T18:15:00.000+02:00",
+      "duration_seconds": 697,
+      "sub_tasks": [
+        {
+          "app": "Daily Activity Review – HY.AM STUDIOS (Google Chrome)",
+          "title": "Daily Activity Review – HY.AM STUDIOS",
+          "start_time_berlin": "2025-10-17T18:00:45.000+02:00",
+          "end_time_berlin": "2025-10-17T18:12:47.000+02:00",
+          "duration_seconds": 233
+        },
+        {
+          "app": "activitywatch (Cursor)",
+          "title": "node — activitywatch",
+          "start_time_berlin": "2025-10-17T18:05:44.000+02:00",
+          "end_time_berlin": "2025-10-17T18:07:45.000+02:00",
+          "duration_seconds": 113
+        }
+      ]
+    }
+  ]
+}

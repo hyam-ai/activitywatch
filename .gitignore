@@ -20,3 +20,7 @@ __pycache__
 # Misc
 .*cache
 .DS_Store
+
+# MCP/Tool directories
+.playwright-mcp/
+.serena/

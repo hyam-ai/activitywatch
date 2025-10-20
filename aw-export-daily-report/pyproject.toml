@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "aw-export-daily-report"
+version = "0.1.0"
+description = "Custom ActivityWatch daily report exporter"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT"
+
+[tool.poetry.scripts]
+aw-export-daily-report = "aw_export_daily_report:main"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+aw-client = "^0.5.14"
+aw-core = "^0.5.17"
+click = "*"
+flask = "*"
+flask-cors = "*"
+python-dotenv = "^1.1.1"
+
+[tool.poetry.dev-dependencies]
+mypy = "*"
+pytest = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
