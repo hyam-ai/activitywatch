@@ -8,6 +8,19 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
+    <script>
+        // Apply theme immediately to prevent flash
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            if (savedTheme === 'light') {
+                document.documentElement.style.setProperty('display', 'none');
+                window.addEventListener('DOMContentLoaded', function() {
+                    document.body.classList.add('light-mode');
+                    document.documentElement.style.removeProperty('display');
+                });
+            }
+        })();
+    </script>
 </head>
 <body>
     <!-- Navigation -->
@@ -16,10 +29,10 @@
             <div class="logo">ACTIVITY REVIEW</div>
             <img src="/static/hyam-logo-light.png" alt="HY.AM" class="nav-logo" id="navLogo">
             <div class="nav-right">
+                <a href="/settings" class="nav-link">Settings</a>
                 <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
                     <span class="theme-icon">☀</span>
                 </button>
-                <div class="nav-date" id="reviewDate"></div>
             </div>
         </div>
     </nav>
@@ -34,6 +47,8 @@
             </div>
             <div class="hero-subtitle">
                 <p class="text-body">Review and submit your work activities</p>
+                <p class="text-body activity-date" id="activityDate"></p>
+                <input type="date" id="datePicker" class="date-picker" max="">
             </div>
         </section>
 
@@ -44,15 +59,8 @@
 
         <!-- Error State -->
         <div id="errorState" class="error-state" style="display: none;">
-            <p class="text-body">[ Error loading data ]</p>
+            <p class="text-body">[ No activity data available ]</p>
             <p class="text-body error-message" id="errorMessage"></p>
-
-            <!-- Date Picker for Manual Selection -->
-            <div class="date-picker-container">
-                <p class="text-body">Select a different date:</p>
-                <input type="date" id="datePicker" class="date-picker">
-                <button id="loadDateBtn" class="button-primary">[ Load Date ]</button>
-            </div>
         </div>
 
         <!-- Timeline Container -->

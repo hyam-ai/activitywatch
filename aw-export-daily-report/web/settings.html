@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings – Daily Activity Review</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/settings.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navigation">
+        <div class="nav-content">
+            <div class="logo">SETTINGS</div>
+            <img src="/static/hyam-logo-light.png" alt="HY.AM" class="nav-logo" id="navLogo">
+            <div class="nav-right">
+                <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+                    <span class="theme-icon">☀</span>
+                </button>
+                <a href="/" class="nav-link">← Back to Review</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="settings-container">
+        <!-- Loading State -->
+        <div id="loadingState" class="loading-state">
+            <p class="text-body">[ Loading settings... ]</p>
+        </div>
+
+        <!-- Settings Form (hidden until loaded) -->
+        <div id="settingsForm" style="display: none;">
+
+            <!-- User Information Section -->
+            <section class="settings-section">
+                <h2 class="section-title">User Information</h2>
+
+                <div class="form-group">
+                    <label for="userEmail">Email Address</label>
+                    <input
+                        type="email"
+                        id="userEmail"
+                        class="form-input"
+                        placeholder="your.email@example.com"
+                    />
+                    <p class="form-hint">Used for activity exports and integrations</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="userTimezone">Timezone</label>
+                    <select id="userTimezone" class="form-select">
+                        <!-- Populated by JavaScript -->
+                    </select>
+                    <p class="form-hint">UI displays times in this timezone (exports always use UTC)</p>
+                </div>
+            </section>
+
+            <!-- Work Schedule Section -->
+            <section class="settings-section">
+                <h2 class="section-title">Work Schedule</h2>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="workScheduleEnabled" class="form-checkbox" />
+                        <span>Enable work hours tracking</span>
+                    </label>
+                </div>
+
+                <div id="workScheduleDetails" style="display: none;">
+                    <div class="form-group">
+                        <label>Work Days</label>
+                        <div class="days-selector">
+                            <label class="day-label">
+                                <input type="checkbox" class="day-checkbox" value="monday" />
+                                <span>Mon</span>
+                            </label>
+                            <label class="day-label">
+                                <input type="checkbox" class="day-checkbox" value="tuesday" />
+                                <span>Tue</span>
+                            </label>
+                            <label class="day-label">
+                                <input type="checkbox" class="day-checkbox" value="wednesday" />
+                                <span>Wed</span>
+                            </label>
+                            <label class="day-label">
+                                <input type="checkbox" class="day-checkbox" value="thursday" />
+                                <span>Thu</span>
+                            </label>
+                            <label class="day-label">
+                                <input type="checkbox" class="day-checkbox" value="friday" />
+                                <span>Fri</span>
+                            </label>
+                            <label class="day-label">
+                                <input type="checkbox" class="day-checkbox" value="saturday" />
+                                <span>Sat</span>
+                            </label>
+                            <label class="day-label">
+                                <input type="checkbox" class="day-checkbox" value="sunday" />
+                                <span>Sun</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="startTime">Start Time</label>
+                            <input
+                                type="time"
+                                id="startTime"
+                                class="form-input"
+                                value="09:00"
+                            />
+                        </div>
+                        <div class="form-group">
+                            <label for="endTime">End Time</label>
+                            <input
+                                type="time"
+                                id="endTime"
+                                class="form-input"
+                                value="18:00"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Save Button -->
+            <div class="settings-actions">
+                <button id="saveSettingsBtn" class="btn-primary">Save Settings</button>
+                <span id="saveStatus" class="save-status"></span>
+            </div>
+            
+            <!-- Unsaved Changes Warning -->
+            <div id="unsavedWarning" class="unsaved-warning" style="display: none;">
+                <span>⚠ You have unsaved changes</span>
+            </div>
+
+            <!-- Integrations Section -->
+            <section class="settings-section">
+                <h2 class="section-title">Integrations</h2>
+
+                <div class="integration-item">
+                    <div class="integration-header">
+                        <div>
+                            <h3 class="integration-title">N8N Webhook</h3>
+                            <p class="integration-desc">Automation workflow integration</p>
+                        </div>
+                        <span class="status-badge status-connected" id="n8nStatusBadge">Enabled</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="n8nEnabled" class="form-checkbox" checked />
+                            <span>Enable webhook integration</span>
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="n8nWebhookUrl">Webhook URL</label>
+                        <input
+                            type="url"
+                            id="n8nWebhookUrl"
+                            class="form-input"
+                            placeholder="https://your-n8n.com/webhook/..."
+                        />
+                    </div>
+                </div>
+
+                <div class="integration-item">
+                    <div class="integration-header">
+                        <div>
+                            <h3 class="integration-title">Asana</h3>
+                            <p class="integration-desc">Task management integration (configured server-side)</p>
+                        </div>
+                        <span class="status-badge status-info">Server Configured</span>
+                    </div>
+                </div>
+
+                <div class="integration-item">
+                    <div class="integration-header">
+                        <div>
+                            <h3 class="integration-title">Google Calendar</h3>
+                            <p class="integration-desc">Calendar events integration</p>
+                        </div>
+                        <span class="status-badge status-disabled">Coming Soon</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="/static/settings.js"></script>
+</body>
+</html>

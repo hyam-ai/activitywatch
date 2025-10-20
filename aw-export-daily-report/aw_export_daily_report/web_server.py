@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 from .data_fetcher import ActivityDataFetcher
 from .timeline_analyzer import TimelineAnalyzer
+from .config import SettingsManager
 
 app = Flask(__name__,
             template_folder='../web',
@@ -24,6 +25,12 @@ CORS(app)
 def index():
     """Serve the review page"""
     return render_template('index.html')
+
+
+@app.route('/settings')
+def settings_page():
+    """Serve the settings page"""
+    return render_template('settings.html')
 
 
 @app.route('/api/activity/<date>')
@@ -157,22 +164,31 @@ def submit_activity():
         
         print(f"✓ Export saved to: {filename}")
 
-        # Send to N8N webhook
-        webhook_url = "https://wins-n8n.zeabur.app/webhook/ai-tracker"
-        try:
-            import requests
-            webhook_response = requests.post(
-                webhook_url,
-                json=data,
-                headers={'Content-Type': 'application/json'},
-                timeout=10
-            )
-            webhook_response.raise_for_status()
-            print(f"✓ Data sent to webhook: {webhook_url}")
-            webhook_status = "success"
-        except Exception as webhook_error:
-            print(f"✗ Webhook failed: {webhook_error}")
-            webhook_status = f"failed: {str(webhook_error)}"
+        # Send to N8N webhook (only if enabled in settings)
+        settings_manager = SettingsManager()
+        settings = settings_manager.load_settings()
+        webhook_enabled = settings.get('integrations', {}).get('n8n', {}).get('enabled', True)
+        webhook_url = settings.get('integrations', {}).get('n8n', {}).get('webhook_url', '')
+        
+        webhook_status = "disabled"
+        
+        if webhook_enabled and webhook_url:
+            try:
+                import requests
+                webhook_response = requests.post(
+                    webhook_url,
+                    json=data,
+                    headers={'Content-Type': 'application/json'},
+                    timeout=10
+                )
+                webhook_response.raise_for_status()
+                print(f"✓ Data sent to webhook: {webhook_url}")
+                webhook_status = "success"
+            except Exception as webhook_error:
+                print(f"✗ Webhook failed: {webhook_error}")
+                webhook_status = f"failed: {str(webhook_error)}"
+        else:
+            print("ℹ Webhook disabled in settings")
 
         return jsonify({
             'success': True,
@@ -190,7 +206,7 @@ def submit_activity():
 @app.route('/api/asana/tasks')
 def get_asana_tasks():
     """
-    Get all incomplete Asana tasks assigned to the current user
+    Get all incomplete Asana tasks assigned to the user (by email from settings)
     
     Returns:
         JSON with tasks grouped by project
@@ -210,6 +226,15 @@ def get_asana_tasks():
             "Authorization": f"Bearer {ASANA_TOKEN}"
         }
         
+        # Load settings to get user email and cached GID
+        settings_manager = SettingsManager()
+        settings = settings_manager.load_settings()
+        user_email = settings.get('user', {}).get('email', '')
+        cached_gid = settings.get('user', {}).get('asana_gid')
+        
+        if not user_email:
+            return jsonify({'error': 'User email not configured in settings'}), 400
+        
         # 1. Get workspace GID
         response = requests.get(f"{BASE_URL}/workspaces", headers=headers)
         workspaces = response.json()['data']
@@ -219,12 +244,44 @@ def get_asana_tasks():
         
         workspace_gid = workspaces[0]['gid']
         
-        # 2. Get all tasks assigned to me with project details
+        # 2. Get or lookup user GID from email
+        user_gid = cached_gid
+        
+        # If no cached GID or email changed, lookup user by email
+        if not user_gid:
+            print(f"Looking up Asana user GID for email: {user_email}")
+            users_response = requests.get(
+                f"{BASE_URL}/workspaces/{workspace_gid}/users",
+                headers=headers,
+                params={
+                    'opt_fields': 'name,email'  # Request email field
+                }
+            )
+            
+            if users_response.status_code == 200:
+                workspace_users = users_response.json()['data']
+                # Find user by email
+                matching_user = next(
+                    (u for u in workspace_users if u.get('email', '').lower() == user_email.lower()),
+                    None
+                )
+                
+                if matching_user:
+                    user_gid = matching_user['gid']
+                    # Cache the GID for future requests
+                    settings_manager.set_user_asana_gid(user_gid)
+                    print(f"✓ Found and cached user GID: {user_gid}")
+                else:
+                    return jsonify({'error': f'No Asana user found with email: {user_email}'}), 404
+            else:
+                return jsonify({'error': f'Failed to fetch workspace users: {users_response.status_code}'}), 500
+        
+        # 3. Get all tasks assigned to this user with project details
         response = requests.get(
             f"{BASE_URL}/tasks",
             headers=headers,
             params={
-                'assignee': 'me',
+                'assignee': user_gid,  # Use GID instead of 'me'
                 'workspace': workspace_gid,
                 'opt_fields': 'name,completed,due_on,projects.name,memberships.project.name,memberships.section.name,num_subtasks',
                 'limit': 100
@@ -296,6 +353,88 @@ def get_asana_tasks():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    """
+    Get current user settings
+
+    Returns:
+        JSON with user settings (email, timezone, work_schedule, integrations)
+    """
+    try:
+        manager = SettingsManager()
+        settings = manager.load_settings()
+        return jsonify(settings)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/settings', methods=['POST'])
+def save_settings():
+    """Save user settings with validation"""
+    try:
+        settings = request.json
+        manager = SettingsManager()
+        
+        # Check if email changed - invalidate cached Asana GID
+        old_settings = manager.load_settings()
+        old_email = old_settings.get('user', {}).get('email', '')
+        new_email = settings.get('user', {}).get('email', '')
+        
+        if old_email != new_email:
+            # Email changed - clear cached Asana GID to force re-lookup
+            settings['user']['asana_gid'] = None
+            print(f"Email changed from '{old_email}' to '{new_email}' - clearing cached Asana GID")
+        
+        success, errors = manager.save_settings(settings)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'email_changed': old_email != new_email  # Signal to frontend
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'errors': errors
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'errors': [str(e)]
+        }), 500
+
+
+@app.route('/api/timezones', methods=['GET'])
+def get_timezones():
+    """
+    Get list of common timezones for dropdown
+
+    Returns:
+        List of IANA timezone strings
+    """
+    # Common timezones for dropdown
+    timezones = [
+        "Europe/Berlin",
+        "Europe/Istanbul",
+        "Europe/London",
+        "Europe/Paris",
+        "Europe/Amsterdam",
+        "Europe/Madrid",
+        "Europe/Rome",
+        "America/New_York",
+        "America/Chicago",
+        "America/Los_Angeles",
+        "America/Toronto",
+        "Asia/Tokyo",
+        "Asia/Shanghai",
+        "Asia/Singapore",
+        "Australia/Sydney",
+        "UTC"
+    ]
+    return jsonify(timezones)
 
 
 @app.route('/health')

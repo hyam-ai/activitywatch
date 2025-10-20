@@ -4,41 +4,52 @@ class ActivityReview {
   constructor() {
     this.data = null;
     this.selectedBlocks = new Set();
-    this.deselectedSupporting = new Map(); // Map<blockIndex, Set<supportIndex>>
-    this.blockNotes = new Map(); // Map<blockIndex, string>
-    this.relabeledBlocks = new Map(); // Map<blockIndex, {app, raw_app}>
-    this.asanaTasks = null; // Store Asana tasks
-    this.blockTasks = new Map(); // Map<blockIndex, taskGid>
+    this.deselectedSupporting = new Map();
+    this.blockNotes = new Map();
+    this.relabeledBlocks = new Map();
+    this.asanaTasks = null;
+    this.blockTasks = new Map();
+    this.settings = null;
     this.init();
   }
 
   async init() {
+    await this.loadSettings();
+    await this.loadAsanaTasks();
+    await this.loadTimelineData();
     this.setupEventListeners();
-    // Load Asana tasks in background (non-blocking)
-    this.loadAsanaTasks(); // No await - runs in parallel
-    // Load timeline data immediately
-    this.loadYesterdayData();
+    this.initializeTheme();
+  }
+
+  async loadSettings() {
+    try {
+      const response = await fetch('/api/settings');
+      if (!response.ok) {
+        console.warn('Failed to load settings, using defaults');
+        this.settings = {
+          user: { timezone: 'Europe/Berlin', email: '' }
+        };
+        return;
+      }
+      this.settings = await response.json();
+      console.log('Settings loaded:', this.settings);
+    } catch (error) {
+      console.warn('Error loading settings:', error);
+      this.settings = {
+        user: { timezone: 'Europe/Berlin', email: '' }
+      };
+    }
   }
 
   setupEventListeners() {
-    // Action bar buttons
+    document.getElementById('themeToggle').addEventListener('click', () => this.toggleTheme());
+    document.getElementById('datePicker').addEventListener('change', (e) => this.loadDateFromPicker(e.target.value));
     document.getElementById('selectAllBtn').addEventListener('click', () => this.selectAll());
     document.getElementById('deselectAllBtn').addEventListener('click', () => this.deselectAll());
     document.getElementById('submitBtn').addEventListener('click', () => this.showSubmitModal());
-
-    // Modal buttons
     document.getElementById('cancelSubmitBtn').addEventListener('click', () => this.hideSubmitModal());
     document.getElementById('confirmSubmitBtn').addEventListener('click', () => this.submitActivities());
     document.getElementById('closeSuccessBtn').addEventListener('click', () => this.hideSuccessModal());
-
-    // Theme toggle
-    document.getElementById('themeToggle').addEventListener('click', () => this.toggleTheme());
-
-    // Date picker for manual date selection (when error occurs)
-    document.getElementById('loadDateBtn').addEventListener('click', () => this.loadSelectedDate());
-
-    // Initialize theme from localStorage
-    this.initializeTheme();
   }
 
   initializeTheme() {
@@ -81,38 +92,93 @@ class ActivityReview {
       }
       this.asanaTasks = await response.json();
       console.log('Asana tasks loaded:', this.asanaTasks);
+      
+      // Re-render timeline to update task dropdowns
+      if (this.data) {
+        this.renderTimeline();
+      }
     } catch (error) {
       console.warn('Error loading Asana tasks:', error);
     }
   }
 
-  async loadYesterdayData() {
+  async loadTimelineData() {
     try {
-      // Temporarily hardcoded to 2025-10-17 for testing
-      const response = await fetch('/api/timeline/2025-10-17');
+      const date = '2025-10-17';
+      const response = await fetch(`/api/timeline/${date}`);
       if (!response.ok) throw new Error('Failed to load timeline data');
 
       this.data = await response.json();
+      
+      // Update activity date display
+      const dateObj = new Date(date);
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayName = dayNames[dateObj.getDay()];
+      document.getElementById('activityDate').textContent = `${dayName}, ${date}`;
+      
+      // Set date picker value and max date (yesterday)
+      const yesterday = this.getYesterdayDate();
+      document.getElementById('datePicker').value = date;
+      document.getElementById('datePicker').max = yesterday;
+      
       this.renderTimeline();
-      this.updateDate();
       this.showUI();
     } catch (error) {
+      console.error('Error loading timeline:', error);
       this.showError(error.message);
     }
   }
 
-  updateDate() {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const dateStr = yesterday.toISOString().split('T')[0];
-    document.getElementById('reviewDate').textContent = dateStr;
+  async loadDateFromPicker(date) {
+    try {
+      const response = await fetch(`/api/timeline/${date}`);
+      if (!response.ok) throw new Error('Failed to load timeline data');
+
+      this.data = await response.json();
+      
+      // Clear previous selections when loading new date
+      this.selectedBlocks.clear();
+      this.deselectedSupporting.clear();
+      this.blockNotes.clear();
+      this.relabeledBlocks.clear();
+      this.blockTasks.clear();
+      
+      // Update activity date display
+      const dateObj = new Date(date);
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayName = dayNames[dateObj.getDay()];
+      document.getElementById('activityDate').textContent = `${dayName}, ${date}`;
+      
+      this.renderTimeline();
+      this.showUI();
+    } catch (error) {
+      console.error('Error loading timeline:', error);
+      this.showError(error.message);
+    }
   }
 
-  // NEW: Convert UTC timestamp to Berlin time (HH:MM format)
-  formatTimeToBerlin(utcTimestamp) {
+  getYesterdayDate() {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    
+    // If today is Monday, go back 3 days to Friday
+    // Otherwise go back 1 day to yesterday
+    const daysToGoBack = (dayOfWeek === 1) ? 3 : 1;
+    
+    const targetDate = new Date(Date.UTC(
+      now.getUTCFullYear(), 
+      now.getUTCMonth(), 
+      now.getUTCDate() - daysToGoBack
+    ));
+    
+    return targetDate.toISOString().split('T')[0];
+  }
+
+  // Convert UTC timestamp to user's timezone (HH:MM format for UI display)
+  formatTimeToUserTimezone(utcTimestamp) {
     // If no timestamp provided, return empty string
     if (!utcTimestamp) return '';
-    
+
     try {
       const date = new Date(utcTimestamp);
       // Check if date is valid
@@ -120,9 +186,11 @@ class ActivityReview {
         console.warn('Invalid timestamp:', utcTimestamp);
         return utcTimestamp; // Return original value
       }
-      
+
+      const userTimezone = this.settings?.user?.timezone || 'Europe/Berlin';
+
       return date.toLocaleTimeString('de-DE', {
-        timeZone: 'Europe/Berlin',
+        timeZone: userTimezone,
         hour: '2-digit',
         minute: '2-digit',
         hour12: false
@@ -133,37 +201,16 @@ class ActivityReview {
     }
   }
 
-  // NEW: Convert UTC timestamp to Berlin timezone ISO format for export
-  convertToBerlinISO(utcTimestamp) {
+  // Convert UTC timestamp to UTC ISO format for export (always UTC)
+  convertToUTCISO(utcTimestamp) {
     if (!utcTimestamp) return null;
-    
+
     try {
       const date = new Date(utcTimestamp);
       if (isNaN(date.getTime())) return null;
-      
-      // Format as ISO string in Berlin timezone
-      const berlinFormatter = new Intl.DateTimeFormat('sv-SE', {
-        timeZone: 'Europe/Berlin',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        fractionalSecondDigits: 3
-      });
-      
-      const parts = berlinFormatter.formatToParts(date);
-      const dateParts = {};
-      parts.forEach(part => {
-        dateParts[part.type] = part.value;
-      });
-      
-      // Get timezone offset for Berlin
-      const berlinOffset = this.getBerlinOffset(date);
-      
-      // Format: YYYY-MM-DDTHH:mm:ss.sss+offset
-      return `${dateParts.year}-${dateParts.month}-${dateParts.day}T${dateParts.hour}:${dateParts.minute}:${dateParts.second}.000${berlinOffset}`;
+
+      // Return as UTC ISO string
+      return date.toISOString();
     } catch (error) {
       console.error('Error converting to Berlin ISO:', error);
       return utcTimestamp;
@@ -241,8 +288,8 @@ class ActivityReview {
       endTimeUTC = `${this.data.date}T${block.end_time}:00+00:00`;
     }
     
-    const startTime = startTimeUTC ? this.formatTimeToBerlin(startTimeUTC) : block.start_time;
-    const endTime = endTimeUTC ? this.formatTimeToBerlin(endTimeUTC) : block.end_time;
+    const startTime = startTimeUTC ? this.formatTimeToUserTimezone(startTimeUTC) : block.start_time;
+    const endTime = endTimeUTC ? this.formatTimeToUserTimezone(endTimeUTC) : block.end_time;
     
     timeCol.innerHTML = `
       <div class="time-range">
@@ -273,6 +320,15 @@ class ActivityReview {
     if (isAFK) {
       // Generate smart suggestions based on surrounding blocks
       const suggestions = this.generateSmartSuggestions(index);
+      
+      // Check if this AFK block is during lunch hours (12:00-15:00)
+      const isLunchTime = this.isLunchTime(block);
+      
+      // Add Lunch option if during lunch hours
+      let lunchOption = '';
+      if (isLunchTime) {
+        lunchOption = '<div class="custom-dropdown-option" data-value="Lunch">Lunch</div>';
+      }
 
       summaryContent.innerHTML = `
         <div class="activity-relabel-wrapper">
@@ -280,6 +336,7 @@ class ActivityReview {
             <div class="custom-dropdown-selected">AFK / Inactive</div>
             <div class="custom-dropdown-options">
               <div class="custom-dropdown-option" data-value="AFK">AFK / Inactive</div>
+              ${lunchOption}
               ${suggestions.map(s => {
                 const escapedValue = s.value.replace(/"/g, '&quot;');
                 return `<div class="custom-dropdown-option" data-value="${escapedValue}">${s.label}</div>`;
@@ -447,6 +504,18 @@ class ActivityReview {
 
     // Add Asana tasks grouped by project
     if (this.asanaTasks) {
+      // Add owner header (e.g., "Alican's Tasks")
+      const ownerEmail = this.settings?.user?.email || '';
+      if (ownerEmail) {
+        const ownerName = ownerEmail.split('@')[0]; // Get part before @
+        const capitalizedName = ownerName.charAt(0).toUpperCase() + ownerName.slice(1);
+        
+        const ownerHeader = document.createElement('div');
+        ownerHeader.className = 'custom-dropdown-owner-header';
+        ownerHeader.textContent = `${capitalizedName}'s Tasks`;
+        tasksOptions.appendChild(ownerHeader);
+      }
+      
       // Add tasks grouped by project
       for (const [projectName, tasks] of Object.entries(this.asanaTasks.tasks_by_project || {})) {
         // Add project header
@@ -610,7 +679,6 @@ class ActivityReview {
   }
 
   generateSmartSuggestions(index) {
-    const suggestions = [];
     const blocks = this.data.timeline_blocks;
     const seen = new Set(); // Track unique activities
 
@@ -632,64 +700,80 @@ class ActivityReview {
       }
     }
 
-    // If both exist and are the same, suggest that activity first
-    if (prevBlock && nextBlock && prevBlock.main_activity.raw_app === nextBlock.main_activity.raw_app) {
-      const isSame = prevBlock.main_activity.primary_window === nextBlock.main_activity.primary_window;
-      if (isSame) {
-        const activityKey = prevBlock.main_activity.app;
-        if (!seen.has(activityKey)) {
-          suggestions.push({
-            value: JSON.stringify({
-              app: prevBlock.main_activity.app,
-              raw_app: prevBlock.main_activity.raw_app,
-              primary_window: prevBlock.main_activity.primary_window || ''
-            }),
-            label: prevBlock.main_activity.app
-          });
-          seen.add(activityKey);
-        }
-      }
-    }
+    const suggestions = [];
 
-    // Add previous activity as suggestion
+    // Add previous block's activity
     if (prevBlock) {
-      const activityKey = prevBlock.main_activity.app;
-      if (!seen.has(activityKey)) {
+      const prevApp = prevBlock.main_activity.app;
+      const prevWindow = prevBlock.main_activity.primary_window;
+      if (!seen.has(prevApp)) {
+        seen.add(prevApp);
         suggestions.push({
+          label: `${prevApp}`,
           value: JSON.stringify({
-            app: prevBlock.main_activity.app,
+            app: prevApp,
             raw_app: prevBlock.main_activity.raw_app,
-            primary_window: prevBlock.main_activity.primary_window || ''
-          }),
-          label: prevBlock.main_activity.app
+            primary_window: prevWindow
+          })
         });
-        seen.add(activityKey);
       }
     }
 
-    // Add next activity as suggestion
+    // Add next block's activity
     if (nextBlock) {
-      const activityKey = nextBlock.main_activity.app;
-      if (!seen.has(activityKey)) {
+      const nextApp = nextBlock.main_activity.app;
+      const nextWindow = nextBlock.main_activity.primary_window;
+      if (!seen.has(nextApp)) {
+        seen.add(nextApp);
         suggestions.push({
+          label: `${nextApp}`,
           value: JSON.stringify({
-            app: nextBlock.main_activity.app,
+            app: nextApp,
             raw_app: nextBlock.main_activity.raw_app,
-            primary_window: nextBlock.main_activity.primary_window || ''
-          }),
-          label: nextBlock.main_activity.app
+            primary_window: nextWindow
+          })
         });
-        seen.add(activityKey);
       }
     }
 
     return suggestions;
   }
 
+  isLunchTime(block) {
+    // Get start time in user's timezone
+    let startTimeUserTZ;
+    
+    if (block.start_time_utc) {
+      // Convert UTC timestamp to user timezone
+      startTimeUserTZ = this.formatTimeToUserTimezone(block.start_time_utc);
+    } else if (block.start_time && this.data.date) {
+      // Reconstruct UTC timestamp and convert
+      const utcTimestamp = `${this.data.date}T${block.start_time}:00+00:00`;
+      startTimeUserTZ = this.formatTimeToUserTimezone(utcTimestamp);
+    } else {
+      return false;
+    }
+    
+    if (!startTimeUserTZ) return false;
+    
+    const [hours, minutes] = startTimeUserTZ.split(':').map(Number);
+    const timeInMinutes = hours * 60 + minutes;
+    
+    // 12:00 = 720 minutes, 15:00 = 900 minutes
+    return timeInMinutes >= 720 && timeInMinutes < 900;
+  }
+
   relabelBlock(index, value) {
     if (value === 'AFK') {
       // Remove relabeling
       this.relabeledBlocks.delete(index);
+    } else if (value === 'Lunch') {
+      // Handle Lunch as a special case (simple string, not JSON)
+      this.relabeledBlocks.set(index, {
+        app: 'Lunch',
+        raw_app: 'Lunch',
+        primary_window: 'Lunch'
+      });
     } else {
       // Parse the JSON value and store relabeling
       try {
@@ -715,6 +799,9 @@ class ActivityReview {
     } else {
       row.classList.remove('relabeled');
     }
+    
+    // Update summary to reflect the relabeling
+    this.updateSummary();
   }
 
   selectAll() {
@@ -745,7 +832,23 @@ class ActivityReview {
     let count = 0;
 
     this.selectedBlocks.forEach(index => {
-      totalTime += this.data.timeline_blocks[index].duration;
+      const block = this.data.timeline_blocks[index];
+      
+      // Skip AFK blocks that haven't been relabeled
+      const isAFK = block.is_afk || block.main_activity.raw_app === 'AFK';
+      const hasRelabel = this.relabeledBlocks.has(index);
+      
+      if (isAFK && !hasRelabel) {
+        return; // Skip un-relabeled AFK
+      }
+      
+      // Skip blocks relabeled as "Lunch"
+      const relabelData = this.relabeledBlocks.get(index);
+      if (relabelData && relabelData.app === 'Lunch') {
+        return; // Skip lunch blocks
+      }
+      
+      totalTime += block.duration;
       count++;
     });
 
@@ -881,8 +984,8 @@ class ActivityReview {
       
       const activity = {
         activity: block.main_activity.app,
-        start_time_berlin: this.convertToBerlinISO(startTimeUTC),
-        end_time_berlin: this.convertToBerlinISO(endTimeUTC),
+        start_time_utc: this.convertToUTCISO(startTimeUTC),
+        end_time_utc: this.convertToUTCISO(endTimeUTC),
         duration_seconds: block.duration
       };
 
@@ -913,8 +1016,8 @@ class ActivityReview {
           return {
             app: support.app,
             title: title,
-            start_time_berlin: this.convertToBerlinISO(supportStartUTC),
-            end_time_berlin: this.convertToBerlinISO(supportEndUTC),
+            start_time_utc: this.convertToUTCISO(supportStartUTC),
+            end_time_utc: this.convertToUTCISO(supportEndUTC),
             duration_seconds: support.duration
           };
         });
@@ -924,9 +1027,9 @@ class ActivityReview {
 
     return {
       metadata: {
-        email: "alican@hyam.de",
+        email: this.settings?.user?.email || "",
         date: data.date,
-        timezone: "Europe/Berlin"
+        timezone: "UTC"
       },
       timeline: activities
     };
@@ -944,12 +1047,18 @@ class ActivityReview {
         console.log(`Skipping AFK block ${index} - not relabeled`);
         return; // Skip this block
       }
+      
+      // Skip blocks relabeled as "Lunch"
+      const relabelData = this.relabeledBlocks.get(index);
+      if (relabelData && relabelData.app === 'Lunch') {
+        console.log(`Skipping block ${index} - labeled as Lunch`);
+        return; // Skip lunch blocks
+      }
 
-      // Apply relabeling if exists
+      // If block was relabeled, update its main activity
       if (this.relabeledBlocks.has(index)) {
         const relabelData = this.relabeledBlocks.get(index);
         block.main_activity = {
-          ...block.main_activity,
           app: relabelData.app,
           raw_app: relabelData.raw_app,
           primary_window: relabelData.primary_window
@@ -1035,6 +1144,7 @@ class ActivityReview {
 
   showUI() {
     document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('errorState').style.display = 'none';
     document.getElementById('timelineContainer').style.display = 'block';
     document.getElementById('actionBar').style.display = 'flex';
   }
@@ -1042,6 +1152,9 @@ class ActivityReview {
   showError(message) {
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('errorState').style.display = 'block';
+    document.getElementById('timelineContainer').style.display = 'none';
+    document.getElementById('actionBar').style.display = 'none';
+    
     document.getElementById('errorMessage').textContent = message;
   }
 
