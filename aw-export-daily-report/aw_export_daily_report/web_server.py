@@ -7,17 +7,31 @@ from flask_cors import CORS
 from datetime import datetime, timedelta
 from pathlib import Path
 import os
+import sys
 import json
 import requests
 from dotenv import load_dotenv
 
-from .data_fetcher import ActivityDataFetcher
-from .timeline_analyzer import TimelineAnalyzer
-from .config import SettingsManager
+from aw_export_daily_report.data_fetcher import ActivityDataFetcher
+from aw_export_daily_report.timeline_analyzer import TimelineAnalyzer
+from aw_export_daily_report.config import SettingsManager
+
+# Detect if running as PyInstaller bundle or in dev mode
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller bundle
+    # Templates are in: Contents/Resources/aw_export_daily_report/web/
+    base_path = Path(sys._MEIPASS)
+    template_folder = base_path / 'aw_export_daily_report' / 'web'
+    static_folder = base_path / 'aw_export_daily_report' / 'web' / 'static'
+else:
+    # Running in dev mode
+    base_path = Path(__file__).parent.parent
+    template_folder = base_path / 'web'
+    static_folder = base_path / 'web' / 'static'
 
 app = Flask(__name__,
-            template_folder='../web',
-            static_folder='../web/static')
+            template_folder=str(template_folder),
+            static_folder=str(static_folder))
 CORS(app)
 
 
@@ -212,8 +226,14 @@ def get_asana_tasks():
         JSON with tasks grouped by project
     """
     try:
-        # Load environment variables
-        env_path = Path(__file__).parent.parent / '.env'
+        # Load environment variables - handle both dev and PyInstaller bundle
+        if getattr(sys, 'frozen', False):
+            # Running as PyInstaller bundle
+            env_path = Path(sys._MEIPASS) / 'aw_export_daily_report' / '.env'
+        else:
+            # Running in dev mode
+            env_path = Path(__file__).parent.parent / '.env'
+
         load_dotenv(env_path)
         
         ASANA_TOKEN = os.getenv('ASANA_PERSONAL_ACCESS_TOKEN')
@@ -443,7 +463,7 @@ def health():
     return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
 
 
-def run_server(host='0.0.0.0', port=8080, debug=True):
+def run_server(host='0.0.0.0', port=9999, debug=False):
     """Run the Flask development server"""
     print(f"""
 ╔══════════════════════════════════════════════════════════╗
@@ -463,4 +483,5 @@ def run_server(host='0.0.0.0', port=8080, debug=True):
 Press Ctrl+C to stop the server
     """)
 
-    app.run(host=host, port=port, debug=debug)
+    # Disable reloader for PyInstaller bundles (causes crashes)
+    app.run(host=host, port=port, debug=debug, use_reloader=False)

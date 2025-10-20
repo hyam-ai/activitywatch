@@ -2,16 +2,24 @@
 Command-line interface for daily report exporter
 """
 
+import sys
+import time
 import click
 from datetime import datetime, timedelta
-from .data_fetcher import ActivityDataFetcher
-from .report_formatter import DailyReportFormatter
+from aw_export_daily_report.data_fetcher import ActivityDataFetcher
+from aw_export_daily_report.report_formatter import DailyReportFormatter
+from aw_export_daily_report.web_server import run_server
 
 
-@click.group()
-def cli():
+@click.group(invoke_without_command=True)
+@click.pass_context
+def cli(ctx):
     """ActivityWatch Daily Report Exporter"""
-    pass
+    # If no subcommand provided, start web server by default
+    if ctx.invoked_subcommand is None:
+        # Wait for aw-server to be ready (manager waits 3s, we add 2s more)
+        time.sleep(2)
+        ctx.invoke(web)
 
 
 @cli.command()
@@ -155,13 +163,14 @@ def stats(date):
 def web(host, port, debug):
     """
     Start the web UI server for activity review
-    
+
     Examples:
         aw-export-daily-report web
         aw-export-daily-report web --port 3000
         aw-export-daily-report web --host localhost --port 9999
+
+    Note: When run without any subcommand, web server starts automatically.
     """
-    from .web_server import run_server
     run_server(host=host, port=port, debug=debug)
 
 

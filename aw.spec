@@ -173,11 +173,18 @@ aw_notify_a = build_analysis(
     "aw_notify", aw_notify_location, hiddenimports=["desktop_notifier.resources"]
 )
 aw_export_daily_report_a = build_analysis(
-    "aw_export_daily_report", 
+    "aw_export_daily_report",
     aw_export_daily_report_location,
     datas=[
         (aw_export_daily_report_location / "web", "aw_export_daily_report/web"),
         (aw_export_daily_report_location / "config", "aw_export_daily_report/config"),
+        (aw_export_daily_report_location / ".env", "aw_export_daily_report"),
+    ],
+    hiddenimports=[
+        "aw_export_daily_report.web_server",
+        "aw_export_daily_report.data_fetcher",
+        "aw_export_daily_report.timeline_analyzer",
+        "aw_export_daily_report.config",
     ],
 )
 
