@@ -119,13 +119,6 @@ body.light-mode .form-hint {
   font-weight: 400;
 }
 
-.form-checkbox {
-  width: 20px;
-  height: 20px;
-  cursor: pointer;
-  accent-color: var(--color-text-primary);
-}
-
 /* Days Selector */
 .days-selector {
   display: flex;
@@ -150,13 +143,6 @@ body.light-mode .form-hint {
 
 .day-label:hover {
   border-color: var(--color-text-primary);
-}
-
-.day-checkbox {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: var(--color-text-primary);
 }
 
 /* Form Row (side by side inputs) */

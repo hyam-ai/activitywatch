@@ -148,6 +148,13 @@ aw-qt/media/logo/logo.icns:
 
 dist/ActivityWatch.app: aw-qt/media/logo/logo.icns
 	pyinstaller --clean --noconfirm aw.spec
+	@echo "Code signing the app bundle..."
+	codesign --deep --force --options runtime \
+	  --entitlements entitlements.plist \
+	  --sign "Developer ID Application: Mehmet Alican Ipek (24FS34VCA3)" \
+	  --timestamp \
+	  dist/ActivityWatch.app
+	@echo "Code signing complete!"
 
 dist/ActivityWatch.dmg: dist/ActivityWatch.app
 	# NOTE: This does not codesign the dmg, that is done in the CI config

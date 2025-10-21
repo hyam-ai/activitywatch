@@ -10,6 +10,11 @@ class ActivityReview {
     this.asanaTasks = null;
     this.blockTasks = new Map();
     this.settings = null;
+    
+    // Cache DOM references
+    this.navLogo = null;
+    this.themeIcon = null;
+    
     this.init();
   }
 
@@ -42,6 +47,10 @@ class ActivityReview {
   }
 
   setupEventListeners() {
+    // Cache theme-related DOM elements
+    this.navLogo = document.getElementById('navLogo');
+    this.themeIcon = document.querySelector('.theme-icon');
+    
     document.getElementById('themeToggle').addEventListener('click', () => this.toggleTheme());
     document.getElementById('datePicker').addEventListener('change', (e) => this.loadDateFromPicker(e.target.value));
     document.getElementById('selectAllBtn').addEventListener('click', () => this.selectAll());
@@ -52,35 +61,46 @@ class ActivityReview {
     document.getElementById('closeSuccessBtn').addEventListener('click', () => this.hideSuccessModal());
   }
 
+  setLogoForTheme(theme) {
+    if (!this.navLogo) return;
+    
+    const logoMap = {
+      light: '/static/hyam-logo-dark.png',
+      dark: '/static/hyam-logo-light.png'
+    };
+    
+    this.navLogo.src = logoMap[theme] || logoMap.dark;
+  }
+
+  setThemeIcon(theme) {
+    if (!this.themeIcon) return;
+    
+    const iconMap = {
+      light: '🌙',
+      dark: '☀'
+    };
+    
+    this.themeIcon.textContent = iconMap[theme] || iconMap.dark;
+  }
+
   initializeTheme() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
-    const navLogo = document.getElementById('navLogo');
     
     if (savedTheme === 'light') {
       document.body.classList.add('light-mode');
-      document.querySelector('.theme-icon').textContent = '🌙';
-      navLogo.src = '/static/hyam-logo-dark.png';
-    } else {
-      navLogo.src = '/static/hyam-logo-light.png';
     }
+    
+    this.setLogoForTheme(savedTheme);
+    this.setThemeIcon(savedTheme);
   }
 
   toggleTheme() {
-    const body = document.body;
-    const themeIcon = document.querySelector('.theme-icon');
-    const navLogo = document.getElementById('navLogo');
+    const isLightMode = document.body.classList.toggle('light-mode');
+    const newTheme = isLightMode ? 'light' : 'dark';
     
-    if (body.classList.contains('light-mode')) {
-      body.classList.remove('light-mode');
-      themeIcon.textContent = '☀';
-      navLogo.src = '/static/hyam-logo-light.png';
-      localStorage.setItem('theme', 'dark');
-    } else {
-      body.classList.add('light-mode');
-      themeIcon.textContent = '🌙';
-      navLogo.src = '/static/hyam-logo-dark.png';
-      localStorage.setItem('theme', 'light');
-    }
+    this.setLogoForTheme(newTheme);
+    this.setThemeIcon(newTheme);
+    localStorage.setItem('theme', newTheme);
   }
 
   async loadAsanaTasks() {
@@ -104,7 +124,7 @@ class ActivityReview {
 
   async loadTimelineData() {
     try {
-      const date = '2025-10-17';
+      const date = this.getYesterdayDate();
       const response = await fetch(`/api/timeline/${date}`);
       if (!response.ok) throw new Error('Failed to load timeline data');
 
@@ -416,9 +436,8 @@ class ActivityReview {
       : block.main_activity.app;
     const formattedMainTitle = this.formatActivityTitle(block.main_activity.app, mainWindow);
     
-    // Calculate actual duration: block.duration * (percentage / 100)
-    const actualDuration = Math.round(block.duration * (parseFloat(block.main_activity.percentage) / 100));
-    const durationText = this.formatDuration(actualDuration);
+    // Use main_activity.duration directly (actual window focus time)
+    const durationText = this.formatDuration(block.main_activity.duration);
     
     // Create duration span for styling
     const durationSpan = document.createElement('span');
@@ -855,8 +874,8 @@ class ActivityReview {
     document.getElementById('selectedTime').textContent = this.formatDuration(totalTime);
     document.getElementById('selectedCount').textContent = count;
 
-    // Update total time in hero section
-    document.getElementById('totalTime').textContent = this.formatDuration(this.data.total_active_time);
+    // Update total time in hero section (same as selected)
+    document.getElementById('totalTime').textContent = this.formatDuration(totalTime);
   }
 
   formatDuration(seconds) {

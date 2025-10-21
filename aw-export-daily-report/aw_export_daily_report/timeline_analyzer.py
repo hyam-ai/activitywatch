@@ -253,6 +253,9 @@ class TimelineAnalyzer:
         Determines main activity (most time spent) and supporting activities
         Groups browsers/editors by window title, other apps by app name
         """
+        # Calculate timeline block duration (always use full interval)
+        timeline_duration = (block_end - block_start).total_seconds()
+        
         # Group by activity key (app or app+window for browsers/editors)
         activity_times = defaultdict(lambda: {'duration': 0, 'windows': [], 'app': '', 'primary_window': '', 'events': []})
 
@@ -334,8 +337,6 @@ class TimelineAnalyzer:
                 'events': data['events']  # Include raw event details
             })
 
-        total_block_duration = sum(data['duration'] for _, data in sorted_activities)
-
         # Calculate main activity timestamps
         if main_data['events']:
             main_start_utc = min(e['start'] for e in main_data['events'])
@@ -349,14 +350,14 @@ class TimelineAnalyzer:
             'end_time': block_end.strftime('%H:%M'),
             'start_time_utc': block_start.isoformat(),
             'end_time_utc': block_end.isoformat(),
-            'duration': round(total_block_duration),
+            'duration': round(timeline_duration),  # Use full timeline duration
             'main_activity': {
                 'app': main_display_name,
                 'raw_app': main_data['app'],
                 'primary_window': main_data['primary_window'],
                 'windows': main_data['windows'],
-                'duration': round(main_data['duration']),
-                'percentage': round((main_data['duration'] / total_block_duration) * 100, 1) if total_block_duration > 0 else 0,
+                'duration': round(main_data['duration']),  # Keep actual window focus time
+                'percentage': round((main_data['duration'] / timeline_duration) * 100, 1) if timeline_duration > 0 else 0,  # Percentage of timeline
                 'start_time_utc': main_start_utc.isoformat() if main_start_utc else None,
                 'end_time_utc': main_end_utc.isoformat() if main_end_utc else None,
                 'events': main_data['events']  # Include raw event details

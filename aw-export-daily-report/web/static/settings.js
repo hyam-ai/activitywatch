@@ -138,7 +138,7 @@ class SettingsManager {
 
     // Work days
     const days = this.settings.work_schedule.days || [];
-    document.querySelectorAll('.day-checkbox').forEach(checkbox => {
+    document.querySelectorAll('.checkbox-sm').forEach(checkbox => {
       checkbox.checked = days.includes(checkbox.value);
     });
 
@@ -175,7 +175,7 @@ class SettingsManager {
   collectFormData() {
     // Collect work days
     const workDays = [];
-    document.querySelectorAll('.day-checkbox:checked').forEach(checkbox => {
+    document.querySelectorAll('.checkbox-sm:checked').forEach(checkbox => {
       workDays.push(checkbox.value);
     });
 

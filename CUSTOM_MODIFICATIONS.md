@@ -2,6 +2,9 @@
 
 **Last Updated:** October 20, 2025
 **Modified By:** Ali Can Ipek
+**Organization:** HY.AM Studios
+**Fork Date:** 2025-10-20
+**Base Version:** ActivityWatch master branch
 **Purpose:** Document all changes made to core ActivityWatch files for custom aw-export-daily-report module integration
 
 ---
@@ -449,6 +452,60 @@ python -c "from aw_export_daily_report.web_server import run_server"
 
 ---
 
+## Upstream Sync Strategy
+
+### Regular Sync Schedule
+- Review official ActivityWatch updates **monthly**
+- Fetch upstream: `git fetch upstream`
+- Review changes: `git log upstream/master`
+- Merge when safe: `git merge upstream/master`
+
+### Pre-Merge Checklist
+- [ ] Review upstream CHANGELOG
+- [ ] Check if Makefile was modified
+- [ ] Check if aw.spec was modified
+- [ ] Check if aw-server/pyproject.toml was modified
+- [ ] Test `aw-export-daily-report` after merge
+- [ ] Verify submodules still work
+- [ ] Run build: `make build`
+- [ ] Test DMG build: `make dist/ActivityWatch.dmg`
+- [ ] Test daily review UI: `cd aw-export-daily-report && poetry run aw-export-daily-report web`
+
+### Conflict Resolution Priority
+1. **Core ActivityWatch code:** Always use upstream version
+2. **Makefile:** Evaluate case-by-case, re-apply our SUBMODULES change
+3. **aw.spec:** Re-apply aw-export-daily-report bundling code
+4. **aw-server/pyproject.toml:** Re-apply Flask version locks if upstream changes them
+5. **aw-export-daily-report/:** Keep ours (no conflicts expected)
+6. **Documentation:** Keep ours (CUSTOM_MODIFICATIONS.md, CLAUDE.md)
+
+### Handling Core File Conflicts
+
+When pulling upstream changes:
+
+1. **Check for conflicts:**
+```bash
+git pull upstream master
+git status
+```
+
+2. **Files that may conflict:**
+- `Makefile` - Re-add aw-export-daily-report to SUBMODULES
+- `aw.spec` - Re-add custom module bundling code
+- `aw-server/pyproject.toml` - Re-apply Flask version locks
+
+3. **Always test build after update:**
+```bash
+make clean_all
+rm -rf venv
+python3 -m venv venv
+source venv/bin/activate
+make build
+make dist/ActivityWatch.dmg
+```
+
+---
+
 ## Rollback Instructions
 
 If modifications cause issues:
@@ -475,6 +532,23 @@ make build
 
 ---
 
+## Future Considerations
+
+### Potential Upstream Contributions
+If `aw-export-daily-report` proves valuable, consider:
+- Proposing as official ActivityWatch plugin
+- Submitting PR to upstream (requires refactoring for generalization)
+- Publishing as standalone ActivityWatch extension
+
+### Maintenance Philosophy
+- Keep `aw-export-daily-report` as self-contained as possible
+- Minimize modifications to core ActivityWatch files
+- Document all changes in this file
+- Test thoroughly before merging upstream updates
+- Prefer isolation over tight integration to reduce merge conflicts
+
+---
+
 ## References
 
 ### Documentation
@@ -496,11 +570,18 @@ make build
 ## Contact & Support
 
 **Maintainer:** Ali Can Ipek
+**Organization:** HY.AM Studios
 **Date Created:** October 20, 2025
 **Last Tested:** October 20, 2025
 **ActivityWatch Version:** v0.13.2.dev+cbc839f
 **Python Version:** 3.9.6
 **macOS Version:** Darwin 24.6.0
+
+### Version History
+
+| Date | Version | Changes |
+|------|---------|---------|
+| 2025-10-20 | 1.0.0 | Initial fork with aw-export-daily-report module |
 
 ---
 

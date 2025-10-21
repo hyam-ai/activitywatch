@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daily Activity Review – HY.AM STUDIOS</title>
+    
+    <!-- Preload logo images for theme switching -->
+    <link rel="preload" href="/static/hyam-logo-light.png" as="image">
+    <link rel="preload" href="/static/hyam-logo-dark.png" as="image">
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -26,12 +31,16 @@
     <!-- Navigation -->
     <nav class="navigation">
         <div class="nav-content">
-            <div class="logo">ACTIVITY REVIEW</div>
-            <img src="/static/hyam-logo-light.png" alt="HY.AM" class="nav-logo" id="navLogo">
+            <div class="nav-left">
+                <div class="logo">ACTIVITY REVIEW</div>
+            </div>
+            <div class="nav-center">
+                <img src="/static/hyam-logo-light.png" alt="" class="nav-logo" id="navLogo">
+            </div>
             <div class="nav-right">
                 <a href="/settings" class="nav-link">Settings</a>
                 <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
-                    <span class="theme-icon">☀</span>
+                    <span class="theme-icon" aria-hidden="true">☀</span>
                 </button>
             </div>
         </div>
@@ -41,12 +50,13 @@
     <main class="container-primary">
         <!-- Hero Section -->
         <section class="hero-section">
-            <h1 class="heading-hero">DAILY ACTIVITY</h1>
-            <div class="hero-meta">
+            <div class="hero-left">
+                <h1 class="heading-hero">DAILY ACTIVITY</h1>
                 <div class="total-time" id="totalTime">0h 0m</div>
+                <p class="text-body hero-description">Review and submit your work activities</p>
             </div>
-            <div class="hero-subtitle">
-                <p class="text-body">Review and submit your work activities</p>
+
+            <div class="hero-right">
                 <p class="text-body activity-date" id="activityDate"></p>
                 <input type="date" id="datePicker" class="date-picker" max="">
             </div>
