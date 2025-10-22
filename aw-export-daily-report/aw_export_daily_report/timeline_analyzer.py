@@ -6,8 +6,6 @@ Groups activities into 15-minute blocks to show chronological work context
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from collections import defaultdict
-import json
-from pathlib import Path
 
 
 class TimelineAnalyzer:
@@ -52,17 +50,12 @@ class TimelineAnalyzer:
         # 5. Calculate total time
         total_time = sum(block['duration'] for block in merged_blocks)
 
-        result = {
+        return {
             "date": day_start.strftime('%Y-%m-%d'),
             "timeline_blocks": merged_blocks,
             "raw_15min_blocks": raw_blocks,  # Include raw blocks for debugging
             "total_active_time": total_time
         }
-        
-        # Export to analysis folder
-        self._export_to_analysis(result)
-        
-        return result
 
     def _filter_active_events(self) -> List[Dict[str, Any]]:
         """Filter out AFK periods and very short activities"""
@@ -457,61 +450,34 @@ class TimelineAnalyzer:
         # If there's any overlap, consider them the same context
         return len(windows1 & windows2) > 0
 
-    def _consolidate_supporting(self, supporting_activities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Consolidate supporting activities by combining same app+window across multiple events
-        """
-        from collections import defaultdict
+    def _consolidate_supporting(self, blocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Consolidate supporting activities across merged blocks"""
+        app_data = defaultdict(lambda: {'duration': 0, 'windows': set(), 'events': []})
 
-        # Group by app and window
-        grouped = defaultdict(lambda: {
-            'duration': 0,
-            'app': None,
-            'raw_app': None,
-            'windows': set(),
-            'start_time_utc': None,
-            'end_time_utc': None,
-            'events': []
-        })
+        for block in blocks:
+            for support in block.get('supporting_activities', []):
+                app = support['app']
+                app_data[app]['duration'] += support['duration']
+                app_data[app]['windows'].update(support['windows'])
 
-        for activity in supporting_activities:
-            app = activity.get('app', 'Unknown')
-            raw_app = activity.get('raw_app', app)
-            windows = activity.get('windows', [])
-            window_key = windows[0] if windows else app
+                # Accumulate events for timestamp tracking
+                if 'events' in support:
+                    app_data[app]['events'].extend(support['events'])
 
-            key = (raw_app, window_key)
-            data = grouped[key]
-
-            data['duration'] += activity['duration']
-            data['app'] = app
-            data['raw_app'] = raw_app
-            if windows:
-                data['windows'].update(windows)
-
-            # Track time range
-            if activity.get('start_time_utc'):
-                start = datetime.fromisoformat(activity['start_time_utc']) if isinstance(activity['start_time_utc'], str) else activity['start_time_utc']
-                if data['start_time_utc'] is None or start < data['start_time_utc']:
-                    data['start_time_utc'] = start
-
-            if activity.get('end_time_utc'):
-                end = datetime.fromisoformat(activity['end_time_utc']) if isinstance(activity['end_time_utc'], str) else activity['end_time_utc']
-                if data['end_time_utc'] is None or end > data['end_time_utc']:
-                    data['end_time_utc'] = end
-
-            data['events'].extend(activity.get('events', []))
-
-        # Convert to list
+        # Build consolidated list with timestamps
         consolidated = []
-        for (raw_app, window_key), data in grouped.items():
-            start_time_utc = data['start_time_utc']
-            end_time_utc = data['end_time_utc']
+        for app, data in sorted(app_data.items(), key=lambda x: x[1]['duration'], reverse=True):
+            # Calculate earliest start and latest end from all events
+            if data['events']:
+                start_time_utc = min(e['start'] for e in data['events'])
+                end_time_utc = max(e['end'] for e in data['events'])
+            else:
+                start_time_utc = None
+                end_time_utc = None
 
             consolidated.append({
-                'app': data['app'],
-                'raw_app': data['raw_app'],
-                'windows': sorted(list(data['windows'])),
+                'app': app,
+                'windows': list(data['windows']),
                 'duration': data['duration'],
                 'start_time_utc': start_time_utc.isoformat() if start_time_utc else None,
                 'end_time_utc': end_time_utc.isoformat() if end_time_utc else None,
@@ -519,41 +485,3 @@ class TimelineAnalyzer:
             })
 
         return consolidated
-    
-    def _export_to_analysis(self, timeline_data: Dict[str, Any]) -> None:
-        """Export timeline analysis to analysis/timeline_analyzer-analysis/latest_timeline.json"""
-        try:
-            # Get project root
-            project_root = Path(__file__).parent.parent
-            output_dir = project_root / 'analysis' / 'timeline_analyzer-analysis'
-            output_dir.mkdir(parents=True, exist_ok=True)
-            
-            output_file = output_dir / 'latest_timeline.json'
-            
-            # Convert datetime objects to ISO strings for JSON serialization
-            serializable_data = {
-                'date': timeline_data['date'],
-                'total_active_time': timeline_data['total_active_time'],
-                'timeline_blocks': self._serialize_blocks(timeline_data['timeline_blocks']),
-                'raw_15min_blocks': self._serialize_blocks(timeline_data['raw_15min_blocks'])
-            }
-            
-            with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(serializable_data, f, indent=2, ensure_ascii=False)
-            
-            print(f"✓ Timeline analyzer export: {output_file}")
-            
-        except Exception as e:
-            print(f"⚠ Failed to export timeline_analyzer analysis: {e}")
-    
-    def _serialize_blocks(self, blocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Convert datetime objects in blocks to ISO strings"""
-        serialized = []
-        for block in blocks:
-            block_copy = block.copy()
-            if 'start_time_utc' in block_copy and isinstance(block_copy['start_time_utc'], datetime):
-                block_copy['start_time_utc'] = block_copy['start_time_utc'].isoformat()
-            if 'end_time_utc' in block_copy and isinstance(block_copy['end_time_utc'], datetime):
-                block_copy['end_time_utc'] = block_copy['end_time_utc'].isoformat()
-            serialized.append(block_copy)
-        return serialized

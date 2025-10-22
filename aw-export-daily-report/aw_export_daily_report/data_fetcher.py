@@ -7,8 +7,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any
 from aw_client import ActivityWatchClient
 from aw_core.models import Event
-import json
-from pathlib import Path
 
 
 class ActivityDataFetcher:
@@ -66,19 +64,13 @@ class ActivityDataFetcher:
             window_events = self.get_events(window_bucket, start, end)
             afk_events = self.get_events(afk_bucket, start, end)
 
-            result = {
+            return {
                 'window': window_events,
                 'afk': afk_events,
                 'date': date,
                 'start': start,
                 'end': end
             }
-            
-            # Export to analysis folder
-            self._export_to_analysis(result)
-            
-            return result
-            
         except Exception as e:
             print(f"Error fetching daily data: {e}")
             return {
@@ -169,45 +161,3 @@ class ActivityDataFetcher:
             daily_data['window'],
             daily_data['afk']
         )
-    
-    def _export_to_analysis(self, data: Dict[str, Any]) -> None:
-        """Export fetched data to analysis/data_fetcher-analysis/latest_fetch.json"""
-        try:
-            # Get project root
-            project_root = Path(__file__).parent.parent
-            output_dir = project_root / 'analysis' / 'data_fetcher-analysis'
-            output_dir.mkdir(parents=True, exist_ok=True)
-            
-            output_file = output_dir / 'latest_fetch.json'
-            
-            # Convert Events to dicts for JSON serialization
-            serializable_data = {
-                'date': data['date'].isoformat() if isinstance(data['date'], datetime) else str(data['date']),
-                'start': data['start'].isoformat() if isinstance(data['start'], datetime) else str(data['start']),
-                'end': data['end'].isoformat() if isinstance(data['end'], datetime) else str(data['end']),
-                'window': [
-                    {
-                        'timestamp': e.timestamp.isoformat(),
-                        'duration': e.duration.total_seconds(),
-                        'data': e.data
-                    } for e in data['window']
-                ],
-                'afk': [
-                    {
-                        'timestamp': e.timestamp.isoformat(),
-                        'duration': e.duration.total_seconds(),
-                        'data': e.data
-                    } for e in data['afk']
-                ]
-            }
-            
-            if 'error' in data:
-                serializable_data['error'] = data['error']
-            
-            with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(serializable_data, f, indent=2, ensure_ascii=False)
-            
-            print(f"✓ Data fetcher export: {output_file}")
-            
-        except Exception as e:
-            print(f"⚠ Failed to export data_fetcher analysis: {e}")

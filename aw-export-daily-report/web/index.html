@@ -35,13 +35,10 @@
                 <div class="logo">ACTIVITY REVIEW</div>
             </div>
             <div class="nav-center">
-                <img src="/static/hyam-logo-light.png" alt="" class="nav-logo" id="navLogo">
+                <img src="/static/hyam-logo-light.png" alt="" class="nav-logo" id="navLogo" style="cursor: pointer;" title="Toggle theme">
             </div>
             <div class="nav-right">
                 <a href="/settings" class="nav-link">Settings</a>
-                <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
-                    <span class="theme-icon" aria-hidden="true">☀</span>
-                </button>
             </div>
         </div>
     </nav>
@@ -57,8 +54,8 @@
             </div>
 
             <div class="hero-right">
-                <p class="text-body activity-date" id="activityDate"></p>
                 <input type="date" id="datePicker" class="date-picker" max="">
+                <p class="text-body hero-description" id="dayName"></p>
             </div>
         </section>
 

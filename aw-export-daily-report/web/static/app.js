@@ -13,7 +13,6 @@ class ActivityReview {
     
     // Cache DOM references
     this.navLogo = null;
-    this.themeIcon = null;
     
     this.init();
   }
@@ -49,9 +48,8 @@ class ActivityReview {
   setupEventListeners() {
     // Cache theme-related DOM elements
     this.navLogo = document.getElementById('navLogo');
-    this.themeIcon = document.querySelector('.theme-icon');
     
-    document.getElementById('themeToggle').addEventListener('click', () => this.toggleTheme());
+    this.navLogo.addEventListener('click', () => this.toggleTheme());
     document.getElementById('datePicker').addEventListener('change', (e) => this.loadDateFromPicker(e.target.value));
     document.getElementById('selectAllBtn').addEventListener('click', () => this.selectAll());
     document.getElementById('deselectAllBtn').addEventListener('click', () => this.deselectAll());
@@ -72,17 +70,6 @@ class ActivityReview {
     this.navLogo.src = logoMap[theme] || logoMap.dark;
   }
 
-  setThemeIcon(theme) {
-    if (!this.themeIcon) return;
-    
-    const iconMap = {
-      light: '🌙',
-      dark: '☀'
-    };
-    
-    this.themeIcon.textContent = iconMap[theme] || iconMap.dark;
-  }
-
   initializeTheme() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
     
@@ -91,7 +78,6 @@ class ActivityReview {
     }
     
     this.setLogoForTheme(savedTheme);
-    this.setThemeIcon(savedTheme);
   }
 
   toggleTheme() {
@@ -99,7 +85,6 @@ class ActivityReview {
     const newTheme = isLightMode ? 'light' : 'dark';
     
     this.setLogoForTheme(newTheme);
-    this.setThemeIcon(newTheme);
     localStorage.setItem('theme', newTheme);
   }
 
@@ -134,7 +119,7 @@ class ActivityReview {
       const dateObj = new Date(date);
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const dayName = dayNames[dateObj.getDay()];
-      document.getElementById('activityDate').textContent = `${dayName}, ${date}`;
+      document.getElementById('dayName').textContent = dayName;
       
       // Set date picker value and max date (yesterday)
       const yesterday = this.getYesterdayDate();
@@ -167,7 +152,7 @@ class ActivityReview {
       const dateObj = new Date(date);
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const dayName = dayNames[dateObj.getDay()];
-      document.getElementById('activityDate').textContent = `${dayName}, ${date}`;
+      document.getElementById('dayName').textContent = dayName;
       
       this.renderTimeline();
       this.showUI();
@@ -287,10 +272,17 @@ class ActivityReview {
     row.className = 'timeline-row';
     row.dataset.blockIndex = index;
 
-    // Add 'selected' class by default
-    block.selected = true;
-    this.selectedBlocks.add(index);
-    row.classList.add('selected');
+    // Check if this is an AFK block
+    const isAFK = block.is_afk || block.main_activity.raw_app === 'AFK';
+
+    // Add 'selected' class by default, except for AFK blocks
+    if (!isAFK) {
+      block.selected = true;
+      this.selectedBlocks.add(index);
+      row.classList.add('selected');
+    } else {
+      block.selected = false;
+    }
 
     // Timeline column (left) - Convert UTC to Berlin time
     const timeCol = document.createElement('div');
@@ -326,7 +318,7 @@ class ActivityReview {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.className = 'block-checkbox';
-    checkbox.checked = true;
+    checkbox.checked = !isAFK;  // Unchecked for AFK blocks
     checkbox.addEventListener('change', (e) => {
       this.toggleBlock(index, e.target.checked);
     });
@@ -335,9 +327,9 @@ class ActivityReview {
     summaryContent.className = 'summary-content';
 
     // Check if this is an AFK block and add smart suggestions
-    const isAFK = block.is_afk || block.main_activity.raw_app === 'AFK';
+    const isAFKBlock = block.is_afk || block.main_activity.raw_app === 'AFK';
 
-    if (isAFK) {
+    if (isAFKBlock) {
       // Generate smart suggestions based on surrounding blocks
       const suggestions = this.generateSmartSuggestions(index);
       
