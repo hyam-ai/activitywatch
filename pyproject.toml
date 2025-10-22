@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "activitywatch"
+name = "aw-hyam-edition"
 version = "0.13.2"
-description = "The free and open-source automated time tracker. Cross-platform, extensible, privacy-focused."
+description = "HYAM fork of ActivityWatch - automated time tracker with custom extensions for internal use"
 authors = ["Erik Bjäreholt <erik@bjareho.lt>", "Johan Bjäreholt <johan@bjareho.lt>"]
 license = "MPL-2.0"
 package-mode = false

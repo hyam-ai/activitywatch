@@ -1,4 +1,23 @@
-How to Contribute
+# ⚠️ Fork Notice
+
+This is a **private fork** of ActivityWatch for HYAM's internal use.
+
+**We are NOT accepting external contributions to this fork.**
+
+For contributing to the original ActivityWatch project, see:
+**https://github.com/ActivityWatch/activitywatch/blob/master/CONTRIBUTING.md**
+
+---
+
+# Internal Development Guidelines (HYAM)
+
+This document is for internal HYAM developers only.
+
+<!-- Original upstream guide preserved below for reference -->
+
+---
+
+How to Contribute (Upstream)
 =================
 
 <!-- This guide could be improved by following the advice at https://mozillascience.github.io/working-open-workshop/contributing/ -->
