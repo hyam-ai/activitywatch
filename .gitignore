@@ -21,6 +21,18 @@ __pycache__
 .*cache
 .DS_Store
 
+# IDE/Editor
+.vscode/
+
+# Workspace files
+*.code-workspace
+
+# Backup files
+*.bak
+
+# Test directories
+aw-export-daily-report/Test/
+
 # MCP/Tool directories
 .playwright-mcp/
 .serena/
@@ -31,3 +43,4 @@ CLAUDE.md
 CUSTOM_MODIFICATIONS.md
 DEPLOYMENT.md
 HYAM_DESIGN_SYSTEM_COMPLETE.md
+activityWatch-compliance.md
