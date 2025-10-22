@@ -25,3 +25,9 @@ __pycache__
 .playwright-mcp/
 .serena/
 aw-export-daily-report/analysis/*.json
+
+# Custom documentation (not part of upstream)
+CLAUDE.md
+CUSTOM_MODIFICATIONS.md
+DEPLOYMENT.md
+HYAM_DESIGN_SYSTEM_COMPLETE.md
