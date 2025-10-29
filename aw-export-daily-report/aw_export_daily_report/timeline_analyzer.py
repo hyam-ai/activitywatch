@@ -12,11 +12,64 @@ class TimelineAnalyzer:
     """Analyzes activities in 15-minute blocks to identify main vs supporting work"""
 
     BLOCK_SIZE_MINUTES = 15
-    MIN_ACTIVITY_SECONDS = 10  # Filter noise
+    MIN_ACTIVITY_SECONDS = 5  # Filter noise
+    AFK_THRESHOLD_SECONDS = 120  # Only exclude AFK periods >= 2 minutes
 
     # Apps that should be grouped by window title (browsers and editors)
     BROWSERS = {'Google Chrome', 'Comet', 'Safari', 'Firefox', 'Arc', 'Brave', 'Microsoft Edge'}
     EDITORS = {'Cursor', 'Code', 'Visual Studio Code', 'Xcode', 'PyCharm', 'IntelliJ IDEA', 'Sublime Text'}
+
+    # Project-based apps (extract project/file name from title)
+    PROJECT_BASED_APPS = {
+        # Creative Suite - Adobe
+        'Adobe After Effects', 'Adobe Illustrator', 'Adobe InDesign',
+        'Adobe Photoshop', 'Adobe Premiere Pro',
+        
+        # Creative Suite - Other
+        'DaVinci Resolve', 'Descript', 'Figma', 'FigJam', 'Canva', 'Miro',
+        
+        # Video/Media
+        'CapCut', 'Vyond', 'Wondershare Filmora',
+        
+        # Office
+        'Microsoft Excel', 'Microsoft Word', 'Microsoft PowerPoint', 'Notion',
+        
+        # Development - Code Editors
+        'Visual Studio Code', 'VS Code', 'IntelliJ IDEA', 'PyCharm', 'Eclipse',
+        'WebStorm', 'Xcode', 'Android Studio', 'Sublime Text', 'Atom',
+        'JupyterLab', 'CLion', 'Cursor', 'JetBrains Fleet',
+        'Microsoft Visual Studio', 'NetBeans', 'Terminal',
+        
+        # AI Coding Agents
+        'Claude Code', 'GitHub Copilot', 'Replit Ghostwriter', 'Windsurf',
+        
+        # Communication
+        'Slack'
+    }
+    
+    # Services that can be desktop OR browser (merge both versions)
+    MERGEABLE_SERVICES = {
+        # Project Management
+        'Asana', 'Notion', 'ClickUp', 'Monday.com', 'Trello',
+        
+        # Creative
+        'Figma', 'FigJam', 'Canva', 'Miro',
+        
+        # Communication
+        'Slack', 'Zoom', 'Google Meet',
+        
+        # Google Workspace
+        'Google Drive', 'Google Docs', 'Google Sheets', 'Google Slides',
+        
+        # Development
+        'Replit', 'JupyterLab', 'GitHub Copilot',
+        
+        # Automation
+        'n8n',
+        
+        # Other
+        'Dropbox', 'Float'
+    }
 
     def __init__(self, events: List[Dict[str, Any]]):
         self.events = events
@@ -58,10 +111,11 @@ class TimelineAnalyzer:
         }
 
     def _filter_active_events(self) -> List[Dict[str, Any]]:
-        """Filter out AFK periods and very short activities"""
+        """Filter out long AFK periods (>= 2 min), loginwindow (screen locked), and very short activities"""
         return [
             event for event in self.events
-            if not event.get('afk', False)
+            if not (event.get('afk', False) and float(event.get('duration', 0)) >= self.AFK_THRESHOLD_SECONDS)
+            and event.get('app', '') != 'loginwindow'
             and float(event.get('duration', 0)) >= self.MIN_ACTIVITY_SECONDS
         ]
 
@@ -75,8 +129,53 @@ class TimelineAnalyzer:
         if not title:
             return app
 
+        # For n8n, remove the " - n8n" suffix
+        if app == 'n8n':
+            # Remove browser suffixes first
+            for suffix in [' - Google Chrome', ' - Comet', ' - Safari', ' - Firefox', ' - Arc', ' - Brave', ' - Microsoft Edge']:
+                title = title.replace(suffix, '')
+            
+            # Remove " - n8n" suffix only
+            if title.endswith(' - n8n'):
+                title = title[:-6]
+            
+            return title.strip()
+
+        # For Google Meet, remove "Meet - " prefix only
+        if app == 'Google Meet':
+            # Remove browser suffixes first
+            for suffix in [' - Google Chrome', ' - Comet', ' - Safari', ' - Firefox', ' - Arc', ' - Brave', ' - Microsoft Edge']:
+                title = title.replace(suffix, '')
+            
+            # Remove "Meet - " prefix only, keep rest of title as-is
+            if title.startswith('Meet - '):
+                title = title[7:]
+            
+            return title.strip()
+
         # For browsers, extract website and page name
         if app in self.BROWSERS:
+            # Gmail Exception: Special handling for Gmail/email clients
+            if 'hy.am studios GmbH Mail' in title or '@hyam.de' in title or title.endswith('Mail'):
+                # Format: "Google Chrome - [Email Subject] - alican@hyam.de - hy.am studios GmbH Mail"
+                # Extract just the email subject
+                # Remove browser prefix
+                cleaned = title
+                for prefix in ['Google Chrome - ', 'Safari - ', 'Firefox - ', 'Arc - ', 'Brave - ', 'Microsoft Edge - ']:
+                    if cleaned.startswith(prefix):
+                        cleaned = cleaned[len(prefix):]
+                        break
+                
+                # Remove email suffix patterns
+                if ' - alican@hyam.de - hy.am studios GmbH Mail' in cleaned:
+                    subject = cleaned.split(' - alican@hyam.de - hy.am studios GmbH Mail')[0]
+                elif ' - hy.am studios GmbH Mail' in cleaned:
+                    subject = cleaned.split(' - hy.am studios GmbH Mail')[0]
+                else:
+                    subject = cleaned
+                
+                return f"Gmail - {subject.strip()}"
+            
             # Remove common browser suffixes
             for suffix in [' - Google Chrome', ' - Comet', ' - Safari', ' - Firefox', ' - Arc', ' - Brave', ' - Microsoft Edge']:
                 title = title.replace(suffix, '')
@@ -120,14 +219,42 @@ class TimelineAnalyzer:
             # No clear pattern, return as-is
             return title.strip()
 
-        # For editors, extract project or file name
-        if app in self.EDITORS:
+        # For Slack, extract channel/DM and workspace
+        if app == 'Slack':
+            # Common patterns:
+            # "aiaiai (Channel) - HY.AM - 3 new items - Slack"
+            # "Izzat, Sarah Heuser (DM) - HY.AM - 3 new items - Slack"
+            # "! random (Channel) - HY.AM - 4 new items - Slack"
+            
+            # Remove " - Slack" suffix
+            if ' - Slack' in title:
+                title = title.replace(' - Slack', '')
+            
+            # Pattern: "channel_name (Channel/DM) - workspace - X new items"
+            # Split by " - "
+            parts = title.split(' - ')
+            
+            if len(parts) >= 2:
+                # First part: channel/DM name (e.g., "aiaiai (Channel)")
+                channel = parts[0].strip()
+                # Second part: workspace name (e.g., "HY.AM")
+                workspace = parts[1].strip()
+                return f"{channel} - {workspace}"
+            
+            # Fallback: return cleaned title
+            return title.strip()
+
+        # For editors and project-based apps, extract project or file name
+        if app in self.EDITORS or app in self.PROJECT_BASED_APPS:
             # Common patterns: "file.py — project" or "project - Editor"
-            if ' — ' in title:
-                parts = title.split(' — ')
+            # Handle em dash (—) - most editors use this
+            if ' — ' in title or '—' in title:
+                # Try with space-padded em dash first
+                parts = title.split(' — ') if ' — ' in title else title.split('—')
                 # Return project name (usually after —)
                 return parts[-1].strip() if len(parts) > 1 else parts[0].strip()
 
+            # Handle regular dash
             if ' - ' in title:
                 parts = title.split(' - ')
                 # Return last part (usually project/context)
@@ -138,8 +265,91 @@ class TimelineAnalyzer:
         # For other apps, return full title
         return title.strip()
 
+    def _detect_service_in_title(self, title: str) -> str:
+        """
+        Detect if title contains a known service name
+        
+        Returns service name if found, else None
+        Used to detect Figma/Asana/etc in browser titles for merging
+        """
+        if not title:
+            return None
+        
+        title_lower = title.lower()
+        
+        # Check for mergeable services (highest priority)
+        for service in self.MERGEABLE_SERVICES:
+            if service.lower() in title_lower:
+                return service
+        
+        # Common service keywords for browsers
+        service_keywords = {
+            'timely': 'Timely',
+            'google drive': 'Google Drive',
+            'google docs': 'Google Docs',
+            'google sheets': 'Google Sheets',
+            'google slides': 'Google Slides',
+            'gmail': 'Gmail',
+            'google meet': 'Google Meet',
+            'meet': 'Google Meet',  # Standalone "meet" also maps to Google Meet
+            'google calendar': 'Google Calendar',
+            'asana': 'Asana',
+            'notion': 'Notion',
+            'slack': 'Slack',
+            'zoom': 'Zoom',
+            'github': 'GitHub',
+            'figma': 'Figma',
+            'figjam': 'FigJam',
+            'canva': 'Canva',
+            'miro': 'Miro',
+            'trello': 'Trello',
+            'monday.com': 'Monday.com',
+            'clickup': 'ClickUp',
+            'linear': 'Linear',
+            'jira': 'Jira',
+            'basecamp': 'Basecamp'
+        }
+        
+        for keyword, service_name in service_keywords.items():
+            if keyword in title_lower:
+                return service_name
+        
+        return None
+
+    def _extract_keywords(self, title: str) -> List[str]:
+        """Extract meaningful keywords from title, excluding generic terms"""
+        generic_terms = {
+            'untitled', 'project', 'workspace', 'document', 'new', 'tab',
+            'window', 'file', 'folder', 'chrome', 'google', 'safari', 'firefox',
+            'browser', 'page', 'home', 'settings', 'preferences', 'search',
+            'results', 'loading', 'welcome', 'default', 'blank', 'empty',
+            'general', 'main', 'editor', 'viewer', 'preview', 'application',
+            'app', 'program', 'system', 'menu', 'toolbar', 'sidebar', 'panel',
+            'dialog', 'modal', 'popup', 'notification', 'alert', 'message',
+            'inbox', 'dashboard', 'overview', 'summary', 'report', 'list',
+            'view', 'details', 'info', 'about', 'help', 'support', 'guide',
+            'tutorial', 'docs', 'documentation', 'readme', 'license', 'terms',
+            'privacy', 'policy', 'login', 'signin', 'signup', 'register',
+            'logout', 'account', 'profile', 'user', 'admin', 'administrator',
+            'manager', 'control', 'configuration', 'options', 'advanced',
+            'basic', 'simple', 'quick', 'start', 'getting', 'started',
+            'open', 'close', 'save', 'export', 'import', 'download', 'upload',
+            'copy', 'paste', 'cut', 'delete', 'remove', 'add', 'create',
+            'edit', 'update', 'modify', 'change', 'rename', 'move'
+        }
+        
+        words = title.lower().split()
+        keywords = []
+        
+        for word in words:
+            cleaned = ''.join(c for c in word if c.isalnum())
+            if len(cleaned) > 3 and cleaned not in generic_terms:
+                keywords.append(cleaned)
+        
+        return keywords
+
     def _get_day_boundaries(self, events: List[Dict[str, Any]]) -> tuple:
-        """Get start and end of the day from events"""
+        """Get start and end of the day from events, limited to 06:00-21:00"""
         timestamps = []
         for e in events:
             ts = e['timestamp']
@@ -148,8 +358,14 @@ class TimelineAnalyzer:
                 ts = datetime.fromisoformat(ts.replace('Z', '+00:00'))
             timestamps.append(ts)
 
-        day_start = min(timestamps).replace(hour=0, minute=0, second=0, microsecond=0)
-        day_end = day_start + timedelta(days=1)
+        earliest = min(timestamps)
+        
+        # Start at 06:00 (6am) same day
+        day_start = earliest.replace(hour=6, minute=0, second=0, microsecond=0)
+        
+        # End at 21:00 (9pm) same day
+        day_end = earliest.replace(hour=21, minute=0, second=0, microsecond=0)
+        
         return day_start, day_end
 
     def _create_time_blocks(
@@ -224,7 +440,7 @@ class TimelineAnalyzer:
                 event_start = datetime.fromisoformat(ts.replace('Z', '+00:00'))
             else:
                 event_start = ts
-            event_end = event_start + timedelta(seconds=float(event['duration']))
+            event_end = event_start + timedelta(seconds=float(event.get('duration', 0)))
 
             # Check if event overlaps with block
             if event_start < block_end and event_end > block_start:
@@ -250,75 +466,89 @@ class TimelineAnalyzer:
         """
         Analyze a single 15-minute block
 
-        Determines main activity (most time spent) and supporting activities
-        Groups browsers/editors by window title, other apps by app name
+        Hybrid approach:
+        - Known app types (browsers/editors/project-based): Use smart primary window extraction
+        - Other apps: Use keyword frequency grouping
         """
         # Calculate timeline block duration (always use full interval)
         timeline_duration = (block_end - block_start).total_seconds()
         
-        # Group by activity key (app or app+window for browsers/editors)
-        activity_times = defaultdict(lambda: {'duration': 0, 'windows': [], 'app': '', 'primary_window': '', 'events': []})
-
+        # STEP 1: Categorize and group events by app
+        from collections import defaultdict
+        app_groups = defaultdict(list)
+        
         for event in block_events:
             app = event.get('app', 'Unknown')
             title = event.get('title', '')
-            duration = event.get('block_duration', 0)
-
-            # Get event timestamps
-            ts = event['timestamp']
-            if isinstance(ts, str):
-                event_start = datetime.fromisoformat(ts.replace('Z', '+00:00'))
-            else:
-                event_start = ts
-            event_end = event_start + timedelta(seconds=float(event.get('duration', 0)))
-
-            # Determine grouping key
-            if app in self.BROWSERS or app in self.EDITORS:
-                # For browsers/editors: group by primary window
-                primary_window = self._extract_primary_window(app, title)
-                activity_key = f"{app}:{primary_window}"
+            
+            # REMOVED: Service detection and app categorization
+            # Just group by raw app name
+            app_groups[app].append(event)
+        
+        # STEP 2: Within each app, use category-specific grouping strategy
+        activity_times = defaultdict(lambda: {
+            'duration': 0, 'windows': [], 'app': '', 'keyword': '', 
+            'primary_window': '', 'events': []
+        })
+        
+        for app, app_events in app_groups.items():
+            # REMOVED: Category-based grouping
+            # Just group by raw window title
+            for event in app_events:
+                title = event.get('title', '')
+                duration = event.get('block_duration', 0)
+                
+                # Get event timestamps
+                ts = event['timestamp']
+                if isinstance(ts, str):
+                    event_start = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                else:
+                    event_start = ts
+                event_end = event_start + timedelta(seconds=float(event.get('duration', 0)))
+                
+                # Format as "App Name - Window Title" (no manipulation)
+                activity_key = f"{app}:{title}"
+                if title:
+                    display_name = f"{app} - {title}"
+                else:
+                    display_name = app
+                
                 activity_times[activity_key]['app'] = app
-                activity_times[activity_key]['primary_window'] = primary_window
-            else:
-                # For other apps: group by app name only
-                activity_key = app
-                activity_times[activity_key]['app'] = app
-                activity_times[activity_key]['primary_window'] = ''
-
-            activity_times[activity_key]['duration'] += duration
-            if title and title not in activity_times[activity_key]['windows']:
-                activity_times[activity_key]['windows'].append(title)
-
-            # Store event details for timestamp tracking
-            activity_times[activity_key]['events'].append({
-                'start': event_start,
-                'end': event_end,
-                'title': title,
-                'duration': duration
-            })
-
+                activity_times[activity_key]['primary_window'] = title
+                activity_times[activity_key]['display_name'] = display_name
+                activity_times[activity_key]['duration'] += duration
+                
+                if title and title not in activity_times[activity_key]['windows']:
+                    activity_times[activity_key]['windows'].append(title)
+                
+                activity_times[activity_key]['events'].append({
+                    'start': event_start,
+                    'end': event_end,
+                    'title': title,
+                    'duration': duration
+                })
+        
         if not activity_times:
             return None
 
-        # Sort activities by duration (descending)
-        sorted_activities = sorted(activity_times.items(), key=lambda x: x[1]['duration'], reverse=True)
+        # Filter out activities < 60 seconds and sort by duration (descending)
+        sorted_activities = sorted(
+            [(key, data) for key, data in activity_times.items() if data['duration'] >= 60],
+            key=lambda x: x[1]['duration'],
+            reverse=True
+        )
+        
+        # If no activities remain after filtering, return None
+        if not sorted_activities:
+            return None
 
         # Main activity = activity with most time
         main_key, main_data = sorted_activities[0]
 
-        # Format main activity display name
-        if main_data['primary_window']:
-            main_display_name = f"{main_data['primary_window']} ({main_data['app']})"
-        else:
-            main_display_name = main_data['app']
-
         # Supporting activities = all others
         supporting = []
         for key, data in sorted_activities[1:]:
-            if data['primary_window']:
-                display_name = f"{data['primary_window']} ({data['app']})"
-            else:
-                display_name = data['app']
+            display_name = data.get('display_name', data['app'])
 
             # Calculate earliest start and latest end from events
             if data['events']:
@@ -330,11 +560,12 @@ class TimelineAnalyzer:
 
             supporting.append({
                 'app': display_name,
+                'primary_window': data['primary_window'],
                 'windows': data['windows'],
                 'duration': round(data['duration']),
                 'start_time_utc': start_time_utc.isoformat() if start_time_utc else None,
                 'end_time_utc': end_time_utc.isoformat() if end_time_utc else None,
-                'events': data['events']  # Include raw event details
+                'events': data['events']
             })
 
         # Calculate main activity timestamps
@@ -350,17 +581,17 @@ class TimelineAnalyzer:
             'end_time': block_end.strftime('%H:%M'),
             'start_time_utc': block_start.isoformat(),
             'end_time_utc': block_end.isoformat(),
-            'duration': round(timeline_duration),  # Use full timeline duration
+            'duration': round(timeline_duration),
             'main_activity': {
-                'app': main_display_name,
+                'app': main_data.get('display_name', main_data['app']),
                 'raw_app': main_data['app'],
                 'primary_window': main_data['primary_window'],
                 'windows': main_data['windows'],
-                'duration': round(main_data['duration']),  # Keep actual window focus time
-                'percentage': round((main_data['duration'] / timeline_duration) * 100, 1) if timeline_duration > 0 else 0,  # Percentage of timeline
+                'duration': round(main_data['duration']),
+                'percentage': round((main_data['duration'] / timeline_duration) * 100, 1) if timeline_duration > 0 else 0,
                 'start_time_utc': main_start_utc.isoformat() if main_start_utc else None,
                 'end_time_utc': main_end_utc.isoformat() if main_end_utc else None,
-                'events': main_data['events']  # Include raw event details
+                'events': main_data['events']
             },
             'supporting_activities': supporting
         }
@@ -393,7 +624,7 @@ class TimelineAnalyzer:
                 continue
 
             # Check if main activity is the same
-            # Compare raw_app and primary_window for accurate matching
+            # Compare raw_app and primary window for accurate matching
             current_raw_app = current_block['main_activity'].get('raw_app', current_block['main_activity']['app'])
             next_raw_app = next_block['main_activity'].get('raw_app', next_block['main_activity']['app'])
 
@@ -412,13 +643,23 @@ class TimelineAnalyzer:
 
             if same_activity and self._same_main_windows(current_block, next_block):
                 # Merge: extend end time and accumulate durations
-                current_block['end_time'] = next_block['end_time']
-                current_block['end_time_utc'] = next_block['end_time_utc']
+                # Safety check: ensure end_time doesn't exceed 21:00
+                end_dt = datetime.fromisoformat(next_block['end_time_utc'])
+                end_hour = end_dt.hour
+                
+                # Cap at 21:00 (do not merge beyond work hours)
+                if end_hour >= 21:
+                    max_end = end_dt.replace(hour=21, minute=0, second=0, microsecond=0)
+                    current_block['end_time'] = max_end.strftime('%H:%M')
+                    current_block['end_time_utc'] = max_end.isoformat()
+                else:
+                    current_block['end_time'] = next_block['end_time']
+                    current_block['end_time_utc'] = next_block['end_time_utc']
                 
                 # Calculate duration from timestamp range instead of summing
                 start_dt = datetime.fromisoformat(current_block['start_time_utc'])
-                end_dt = datetime.fromisoformat(next_block['end_time_utc'])
-                current_block['duration'] = int((end_dt - start_dt).total_seconds())
+                capped_end_dt = datetime.fromisoformat(current_block['end_time_utc'])
+                current_block['duration'] = int((capped_end_dt - start_dt).total_seconds())
                 
                 current_block['main_activity']['duration'] += next_block['main_activity']['duration']
 
@@ -437,7 +678,58 @@ class TimelineAnalyzer:
         # Don't forget the last block
         merged.append(current_block)
 
-        return merged
+        # Apply 10% threshold filter: convert blocks with main activity < 10% to AFK
+        filtered = []
+        for block in merged:
+            if block.get('is_afk'):
+                # Already AFK, keep as-is
+                filtered.append(block)
+            else:
+                main_percentage = block['main_activity']['percentage']
+                if main_percentage >= 10.0:
+                    # Keep blocks with significant main activity
+                    filtered.append(block)
+                else:
+                    # Convert low-activity blocks to AFK
+                    block['is_afk'] = True
+                    block['main_activity'] = {
+                        'app': 'AFK / Inactive',
+                        'raw_app': 'AFK',
+                        'primary_window': '',
+                        'windows': [],
+                        'duration': block['duration'],
+                        'percentage': 100.0
+                    }
+                    block['supporting_activities'] = []
+                    filtered.append(block)
+
+        # Post-processing: Merge consecutive AFK blocks
+        final_merged = []
+        current_afk = None
+        
+        for block in filtered:
+            if block.get('is_afk'):
+                if current_afk is None:
+                    # Start new AFK block
+                    current_afk = block.copy()
+                else:
+                    # Extend existing AFK block
+                    current_afk['end_time'] = block['end_time']
+                    if 'end_time_utc' in block:
+                        current_afk['end_time_utc'] = block['end_time_utc']
+                    current_afk['duration'] += block['duration']
+            else:
+                # Active block - save any pending AFK block first
+                if current_afk is not None:
+                    final_merged.append(current_afk)
+                    current_afk = None
+                final_merged.append(block)
+        
+        # Don't forget trailing AFK block
+        if current_afk is not None:
+            final_merged.append(current_afk)
+
+        return final_merged
 
     def _same_main_windows(self, block1: Dict[str, Any], block2: Dict[str, Any]) -> bool:
         """Check if two blocks have significant overlap in window titles"""

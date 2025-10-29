@@ -14,8 +14,7 @@ class SettingsManager:
     DEFAULT_SETTINGS = {
         "user": {
             "email": "",
-            "timezone": "Europe/Berlin",
-            "asana_gid": None  # Cached Asana user GID
+            "timezone": "Europe/Berlin"
         },
         "work_schedule": {
             "enabled": False,
@@ -27,6 +26,23 @@ class SettingsManager:
             "n8n": {
                 "enabled": True,
                 "webhook_url": "https://wins-n8n.zeabur.app/webhook/ai-tracker"
+            },
+            "asana": {
+                "enabled": False,
+                "personal_access_token": "",  # Load from .env file (ASANA_PERSONAL_ACCESS_TOKEN)
+                "cache": {
+                    "user_gid": "",
+                    "tasks_cache": {}
+                },
+                "task_filters": {
+                    "match_task_names": [
+                        "Internal Comms & Team Management",
+                        "Meetings, Communications, Project Management",
+                        "Team Management (1-on-1s, all-hands, best-self review, management meeting, retrospective, sprint meetings, stand-up & team meeting)"
+                    ],
+                    "match_sections_containing": ["time-tracking"],
+                    "match_all_tasks": False
+                }
             }
         }
     }
@@ -89,15 +105,140 @@ class SettingsManager:
         settings = self.load_settings()
         return settings.get('integrations', {}).get('n8n', {}).get('webhook_url', '')
 
-    def get_user_asana_gid(self) -> Optional[str]:
+    def get_asana_token(self) -> str:
+        """
+        Get Asana personal access token from settings or .env file
+
+        Priority: settings.json > .env file > empty string
+        """
+        import os
+        from dotenv import load_dotenv
+
+        # Try settings first
+        settings = self.load_settings()
+        token = settings.get('integrations', {}).get('asana', {}).get('personal_access_token', '')
+
+        # If empty, try loading from .env
+        if not token:
+            load_dotenv()
+            token = os.getenv('ASANA_PERSONAL_ACCESS_TOKEN', '')
+
+        return token
+
+    def get_asana_user_gid(self) -> str:
         """Get cached Asana user GID from settings"""
         settings = self.load_settings()
-        return settings.get('user', {}).get('asana_gid')
+        return settings.get('integrations', {}).get('asana', {}).get('cache', {}).get('user_gid', '')
 
-    def set_user_asana_gid(self, asana_gid: str) -> bool:
-        """Cache Asana user GID in settings"""
+    def set_asana_user_gid(self, gid: str) -> bool:
+        """
+        Cache Asana user GID to settings
+        
+        Args:
+            gid: User GID to cache
+            
+        Returns:
+            True if saved successfully
+        """
         settings = self.load_settings()
-        settings['user']['asana_gid'] = asana_gid
+        
+        # Ensure asana settings exist
+        if 'integrations' not in settings:
+            settings['integrations'] = {}
+        if 'asana' not in settings['integrations']:
+            settings['integrations']['asana'] = self.DEFAULT_SETTINGS['integrations']['asana'].copy()
+        if 'cache' not in settings['integrations']['asana']:
+            settings['integrations']['asana']['cache'] = {}
+            
+        settings['integrations']['asana']['cache']['user_gid'] = gid
+        
+        success, _ = self.save_settings(settings)
+        return success
+
+    def is_asana_enabled(self) -> bool:
+        """Check if Asana integration is enabled"""
+        settings = self.load_settings()
+        return settings.get('integrations', {}).get('asana', {}).get('enabled', False)
+
+    def get_asana_filters(self) -> dict:
+        """Get Asana task filter configuration"""
+        settings = self.load_settings()
+        return settings.get('integrations', {}).get('asana', {}).get('task_filters', {})
+
+    def get_cached_tasks(self, email: str, ttl_seconds: int = 1800) -> Optional[list]:
+        """
+        Get cached Asana tasks for email if cache is fresh
+        
+        Args:
+            email: User email
+            ttl_seconds: Time-to-live in seconds (default: 1800 = 30 minutes)
+            
+        Returns:
+            List of tasks if cache is fresh, None otherwise
+        """
+        from datetime import datetime, timezone
+        
+        settings = self.load_settings()
+        tasks_cache = settings.get('integrations', {}).get('asana', {}).get('cache', {}).get('tasks_cache', {})
+        
+        if email not in tasks_cache:
+            return None
+            
+        cache_entry = tasks_cache[email]
+        cached_tasks = cache_entry.get('tasks', [])
+        timestamp_str = cache_entry.get('timestamp', '')
+        
+        if not timestamp_str:
+            return None
+            
+        try:
+            # Parse timestamp
+            cached_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            current_time = datetime.now(timezone.utc)
+            
+            # Check if cache is fresh
+            age_seconds = (current_time - cached_time).total_seconds()
+            
+            if age_seconds < ttl_seconds:
+                return cached_tasks
+            else:
+                return None  # Cache expired
+                
+        except Exception as e:
+            print(f"Error checking cache: {e}")
+            return None
+
+    def set_cached_tasks(self, email: str, tasks: list) -> bool:
+        """
+        Cache Asana tasks for email with current timestamp
+        
+        Args:
+            email: User email
+            tasks: List of task objects to cache
+            
+        Returns:
+            True if saved successfully
+        """
+        from datetime import datetime, timezone
+        
+        settings = self.load_settings()
+        
+        # Ensure structure exists
+        if 'integrations' not in settings:
+            settings['integrations'] = {}
+        if 'asana' not in settings['integrations']:
+            settings['integrations']['asana'] = self.DEFAULT_SETTINGS['integrations']['asana'].copy()
+        if 'cache' not in settings['integrations']['asana']:
+            settings['integrations']['asana']['cache'] = {}
+        if 'tasks_cache' not in settings['integrations']['asana']['cache']:
+            settings['integrations']['asana']['cache']['tasks_cache'] = {}
+            
+        # Store tasks with timestamp
+        settings['integrations']['asana']['cache']['tasks_cache'][email] = {
+            'tasks': tasks,
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+        
         success, _ = self.save_settings(settings)
         return success
 
@@ -113,6 +254,17 @@ class SettingsManager:
         if 'integrations' in settings:
             if 'n8n' in settings['integrations']:
                 merged['integrations']['n8n'].update(settings['integrations']['n8n'])
+            if 'asana' in settings['integrations']:
+                merged['integrations']['asana'].update(settings['integrations']['asana'])
+                # Deep merge task_filters and cache
+                if 'task_filters' in settings['integrations']['asana']:
+                    merged['integrations']['asana']['task_filters'].update(
+                        settings['integrations']['asana']['task_filters']
+                    )
+                if 'cache' in settings['integrations']['asana']:
+                    merged['integrations']['asana']['cache'].update(
+                        settings['integrations']['asana']['cache']
+                    )
 
         return merged
 

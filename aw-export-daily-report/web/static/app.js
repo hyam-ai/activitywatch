@@ -3,13 +3,15 @@
 class ActivityReview {
   constructor() {
     this.data = null;
+    this.summaryData = null;
+    this.currentView = 'timeline';
     this.selectedBlocks = new Set();
     this.deselectedSupporting = new Map();
     this.blockNotes = new Map();
     this.relabeledBlocks = new Map();
-    this.asanaTasks = null;
     this.blockTasks = new Map();
     this.settings = null;
+    this.asanaTasks = [];
     
     // Cache DOM references
     this.navLogo = null;
@@ -45,12 +47,58 @@ class ActivityReview {
     }
   }
 
+  async loadAsanaTasks() {
+    try {
+      const email = this.settings?.user?.email;
+      
+      if (!email) {
+        console.log('No email configured, skipping Asana tasks load');
+        this.asanaTasks = [];
+        return;
+      }
+      
+      // Check if Asana is enabled
+      const asanaEnabled = this.settings?.integrations?.asana?.enabled;
+      if (!asanaEnabled) {
+        console.log('Asana integration not enabled, skipping tasks load');
+        this.asanaTasks = [];
+        return;
+      }
+      
+      console.log(`Fetching Asana tasks for: ${email}`);
+      const response = await fetch(`/api/asana/tasks?email=${encodeURIComponent(email)}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.warn('Failed to load Asana tasks:', errorData.error);
+        this.asanaTasks = [];
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.tasks) {
+        this.asanaTasks = data.tasks;
+        const cacheStatus = data.cached ? '(cached)' : '(fresh from API)';
+        console.log(`✓ Loaded ${this.asanaTasks.length} Asana tasks ${cacheStatus}`);
+      } else {
+        console.warn('Asana API error:', data.error);
+        this.asanaTasks = [];
+      }
+    } catch (error) {
+      console.warn('Error loading Asana tasks:', error);
+      this.asanaTasks = [];
+    }
+  }
+
   setupEventListeners() {
     // Cache theme-related DOM elements
     this.navLogo = document.getElementById('navLogo');
     
     this.navLogo.addEventListener('click', () => this.toggleTheme());
     document.getElementById('datePicker').addEventListener('change', (e) => this.loadDateFromPicker(e.target.value));
+    document.getElementById('viewTimelineBtn').addEventListener('click', () => this.switchView('timeline'));
+    document.getElementById('viewSummaryBtn').addEventListener('click', () => this.switchView('summary'));
     document.getElementById('selectAllBtn').addEventListener('click', () => this.selectAll());
     document.getElementById('deselectAllBtn').addEventListener('click', () => this.deselectAll());
     document.getElementById('submitBtn').addEventListener('click', () => this.showSubmitModal());
@@ -86,25 +134,6 @@ class ActivityReview {
     
     this.setLogoForTheme(newTheme);
     localStorage.setItem('theme', newTheme);
-  }
-
-  async loadAsanaTasks() {
-    try {
-      const response = await fetch('/api/asana/tasks');
-      if (!response.ok) {
-        console.warn('Failed to load Asana tasks');
-        return;
-      }
-      this.asanaTasks = await response.json();
-      console.log('Asana tasks loaded:', this.asanaTasks);
-      
-      // Re-render timeline to update task dropdowns
-      if (this.data) {
-        this.renderTimeline();
-      }
-    } catch (error) {
-      console.warn('Error loading Asana tasks:', error);
-    }
   }
 
   async loadTimelineData() {
@@ -154,7 +183,13 @@ class ActivityReview {
       const dayName = dayNames[dateObj.getDay()];
       document.getElementById('dayName').textContent = dayName;
       
-      this.renderTimeline();
+      // Render current view
+      if (this.currentView === 'summary') {
+        await this.loadSummaryData();
+        this.renderSummary();
+      } else {
+        this.renderTimeline();
+      }
       this.showUI();
     } catch (error) {
       console.error('Error loading timeline:', error);
@@ -177,6 +212,93 @@ class ActivityReview {
     ));
     
     return targetDate.toISOString().split('T')[0];
+  }
+
+  async switchView(viewName) {
+    this.currentView = viewName;
+    
+    // Update button states
+    document.getElementById('viewTimelineBtn').classList.toggle('active', viewName === 'timeline');
+    document.getElementById('viewSummaryBtn').classList.toggle('active', viewName === 'summary');
+    
+    if (viewName === 'summary') {
+      await this.loadSummaryData();
+      this.renderSummary();
+    } else {
+      this.renderTimeline();
+    }
+  }
+
+  async loadSummaryData() {
+    try {
+      const date = document.getElementById('datePicker').value;
+      const response = await fetch(`/api/summary/${date}`);
+      if (!response.ok) throw new Error('Failed to load summary data');
+
+      this.summaryData = await response.json();
+    } catch (error) {
+      console.error('Error loading summary:', error);
+      this.showError(error.message);
+    }
+  }
+
+  renderSummary() {
+    const container = document.getElementById('timelineContainer');
+    container.innerHTML = '';
+
+    // Create columns container
+    const columnsContainer = document.createElement('div');
+    columnsContainer.className = 'summary-columns-container';
+
+    // Create a column for each app
+    this.summaryData.apps.forEach((appData) => {
+      const column = this.createAppColumn(appData);
+      columnsContainer.appendChild(column);
+    });
+
+    container.appendChild(columnsContainer);
+    
+    // Update total time in hero section
+    document.getElementById('totalTime').textContent = this.formatDuration(this.summaryData.total_active_time);
+  }
+
+  createAppColumn(appData) {
+    const column = document.createElement('div');
+    column.className = 'summary-app-column';
+
+    // Column header (app name + total duration)
+    const header = document.createElement('div');
+    header.className = 'summary-app-header';
+    header.innerHTML = `
+      <div class="summary-app-name">${appData.app}</div>
+      <div class="summary-app-total">${this.formatDuration(appData.total_duration)}</div>
+    `;
+    column.appendChild(header);
+
+    // Activities list
+    const activitiesList = document.createElement('div');
+    activitiesList.className = 'summary-activities-list';
+
+    appData.activities.forEach((activity) => {
+      const activityItem = document.createElement('div');
+      activityItem.className = 'summary-activity-item';
+      
+      const titleDiv = document.createElement('div');
+      titleDiv.className = 'summary-activity-title';
+      titleDiv.textContent = activity.title;
+      
+      const durationDiv = document.createElement('div');
+      durationDiv.className = 'summary-activity-duration';
+      durationDiv.textContent = this.formatDuration(activity.duration);
+      
+      activityItem.appendChild(titleDiv);
+      activityItem.appendChild(durationDiv);
+      activitiesList.appendChild(activityItem);
+    });
+
+    column.appendChild(activitiesList);
+
+    return column;
   }
 
   // Convert UTC timestamp to user's timezone (HH:MM format for UI display)
@@ -284,6 +406,11 @@ class ActivityReview {
       block.selected = false;
     }
 
+    // Block duration label (outside grid, positioned left)
+    const durationLabel = document.createElement('div');
+    durationLabel.className = 'block-duration-label';
+    durationLabel.textContent = this.formatDuration(block.duration);
+
     // Timeline column (left) - Convert UTC to Berlin time
     const timeCol = document.createElement('div');
     timeCol.className = 'timeline-col-time';
@@ -355,7 +482,7 @@ class ActivityReview {
               }).join('')}
             </div>
           </div>
-          <div class="summary-time">Total: <span class="duration-text">${this.formatDuration(block.duration)}</span> (${block.main_activity.percentage}%)</div>
+          <div class="summary-time">Total: <span class="duration-text">${this.formatDuration(block.main_activity.duration)}</span> (${block.main_activity.percentage}%)</div>
         </div>
       `;
 
@@ -395,16 +522,12 @@ class ActivityReview {
         }
       });
     } else {
-      // Get first window title or fallback to app name
-      const windowTitle = block.main_activity.windows && block.main_activity.windows.length > 0
-        ? block.main_activity.windows[0]
-        : block.main_activity.app;
-      
-      const formattedTitle = this.formatActivityTitle(block.main_activity.app, windowTitle);
+      // Show raw display_name from backend (no frontend processing)
+      const displayTitle = block.main_activity.app;
       
       summaryContent.innerHTML = `
-        <div class="summary-app">${formattedTitle}</div>
-        <div class="summary-time">Total: <span class="duration-text">${this.formatDuration(block.duration)}</span> (${block.main_activity.percentage}%)</div>
+        <div class="summary-app">${displayTitle}</div>
+        <div class="summary-time">Total: <span class="duration-text">${this.formatDuration(block.main_activity.duration)}</span> (${block.main_activity.percentage}%)</div>
       `;
     }
 
@@ -417,28 +540,6 @@ class ActivityReview {
 
     const logsList = document.createElement('div');
     logsList.className = 'logs-list';
-
-    // Main activity - show once with actual duration
-    const mainLogItem = document.createElement('div');
-    mainLogItem.className = 'log-item log-main';
-    
-    // Use first window or app name for title
-    const mainWindow = block.main_activity.windows && block.main_activity.windows.length > 0
-      ? block.main_activity.windows[0]
-      : block.main_activity.app;
-    const formattedMainTitle = this.formatActivityTitle(block.main_activity.app, mainWindow);
-    
-    // Use main_activity.duration directly (actual window focus time)
-    const durationText = this.formatDuration(block.main_activity.duration);
-    
-    // Create duration span for styling
-    const durationSpan = document.createElement('span');
-    durationSpan.className = 'duration-text';
-    durationSpan.textContent = durationText;
-    
-    mainLogItem.innerHTML = `• ${formattedMainTitle} `;
-    mainLogItem.appendChild(durationSpan);
-    logsList.appendChild(mainLogItem);
 
     // Supporting activities with checkboxes (filter out <1min)
     if (!this.deselectedSupporting.has(index)) {
@@ -469,19 +570,15 @@ class ActivityReview {
       // Format duration using formatDuration helper for consistent spacing
       const durationText = this.formatDuration(support.duration);
 
-      // Get title from windows array or fallback to app name
-      const title = support.windows && support.windows.length > 0
-        ? support.windows[0]
-        : support.app;
+      // Show raw app name from backend (no frontend processing)
+      const title = support.app;
 
-      const formattedTitle = this.formatActivityTitle(support.app, title);
-      
       // Add duration wrapped in span for styling
       const durationSpan = document.createElement('span');
       durationSpan.className = 'duration-text';
       durationSpan.textContent = durationText;
       
-      supportLabel.innerHTML = `${formattedTitle} `;
+      supportLabel.innerHTML = `${title} `;
       supportLabel.appendChild(durationSpan);
 
       supportItem.appendChild(supportCheckbox);
@@ -513,54 +610,16 @@ class ActivityReview {
     noneOption.textContent = 'None';
     tasksOptions.appendChild(noneOption);
 
-    // Add Asana tasks grouped by project
-    if (this.asanaTasks) {
-      // Add owner header (e.g., "Alican's Tasks")
-      const ownerEmail = this.settings?.user?.email || '';
-      if (ownerEmail) {
-        const ownerName = ownerEmail.split('@')[0]; // Get part before @
-        const capitalizedName = ownerName.charAt(0).toUpperCase() + ownerName.slice(1);
-        
-        const ownerHeader = document.createElement('div');
-        ownerHeader.className = 'custom-dropdown-owner-header';
-        ownerHeader.textContent = `${capitalizedName}'s Tasks`;
-        tasksOptions.appendChild(ownerHeader);
-      }
-      
-      // Add tasks grouped by project
-      for (const [projectName, tasks] of Object.entries(this.asanaTasks.tasks_by_project || {})) {
-        // Add project header
-        const projectHeader = document.createElement('div');
-        projectHeader.className = 'custom-dropdown-optgroup-label';
-        projectHeader.textContent = projectName;
-        tasksOptions.appendChild(projectHeader);
-        
-        tasks.forEach(task => {
-          const option = document.createElement('div');
-          option.className = 'custom-dropdown-option';
-          option.dataset.value = task.gid;
-          option.dataset.taskName = task.name;
-          option.textContent = task.name;
-          tasksOptions.appendChild(option);
-        });
-      }
-      
-      // Add tasks without project
-      if (this.asanaTasks.tasks_without_project && this.asanaTasks.tasks_without_project.length > 0) {
-        const projectHeader = document.createElement('div');
-        projectHeader.className = 'custom-dropdown-optgroup-label';
-        projectHeader.textContent = 'No Project';
-        tasksOptions.appendChild(projectHeader);
-        
-        this.asanaTasks.tasks_without_project.forEach(task => {
-          const option = document.createElement('div');
-          option.className = 'custom-dropdown-option';
-          option.dataset.value = task.gid;
-          option.dataset.taskName = task.name;
-          option.textContent = task.name;
-          tasksOptions.appendChild(option);
-        });
-      }
+    // Add Asana tasks if available
+    if (this.asanaTasks && this.asanaTasks.length > 0) {
+      this.asanaTasks.forEach(task => {
+        const option = document.createElement('div');
+        option.className = 'custom-dropdown-option';
+        option.dataset.value = task.task_id;
+        option.dataset.taskName = task.task_name;
+        option.textContent = `${task.task_name} (${task.project_name})`;
+        tasksOptions.appendChild(option);
+      });
     }
 
     tasksDropdownContainer.appendChild(tasksSelected);
@@ -633,6 +692,7 @@ class ActivityReview {
 
     notesCol.appendChild(notesTextarea);
 
+    row.appendChild(durationLabel);
     row.appendChild(timeCol);
     row.appendChild(summaryCol);
     row.appendChild(logsCol);
@@ -776,8 +836,12 @@ class ActivityReview {
 
   relabelBlock(index, value) {
     if (value === 'AFK') {
-      // Remove relabeling
-      this.relabeledBlocks.delete(index);
+      // Treat AFK same as other selections - add to relabeled blocks
+      this.relabeledBlocks.set(index, {
+        app: 'AFK / Inactive',
+        raw_app: 'AFK',
+        primary_window: ''
+      });
     } else if (value === 'Lunch') {
       // Handle Lunch as a special case (simple string, not JSON)
       this.relabeledBlocks.set(index, {
@@ -885,53 +949,8 @@ class ActivityReview {
   }
 
   formatActivityTitle(appName, windowTitle) {
-    // Extract browser from app name (e.g., "Timely - Hours (Google Chrome)" -> "Google Chrome")
-    const browserMatch = appName.match(/\(([^)]+)\)$/);
-    const browser = browserMatch ? browserMatch[1] : null;
-
-    if (browser) {
-      // Browser-based activity
-      // Extract app/page name from app field (e.g., "Timely - Hours (Google Chrome)" -> "Timely - Hours")
-      const appPart = appName.replace(/\s*\([^)]+\)$/, '');
-      
-      // Try to extract app name and feature from title or app part
-      // Title format is usually "Feature - AppName" or just "AppName"
-      let appNameClean = '';
-      let feature = '';
-      
-      if (windowTitle) {
-        const titleParts = windowTitle.split(' - ');
-        if (titleParts.length >= 2) {
-          // "Hours - Timely" -> feature: "Hours", app: "Timely"
-          feature = titleParts[0];
-          appNameClean = titleParts[titleParts.length - 1];
-        } else {
-          // Just app name
-          appNameClean = windowTitle;
-        }
-      }
-      
-      // If we couldn't get app name from title, use from app field
-      if (!appNameClean) {
-        const appParts = appPart.split(' - ');
-        appNameClean = appParts[appParts.length - 1] || appPart;
-      }
-      
-      // Format: Browser - AppName - Feature (or just Browser - AppName if no feature)
-      if (feature && feature !== appNameClean) {
-        return `${browser} - ${appNameClean} - ${feature}`;
-      } else {
-        return `${browser} - ${appNameClean}`;
-      }
-    } else {
-      // Non-browser activity (e.g., "Claude", "TIDAL")
-      // Format: AppName - Feature (if available from window title)
-      if (windowTitle && windowTitle !== appName) {
-        return `${appName} - ${windowTitle}`;
-      } else {
-        return appName;
-      }
-    }
+    // Return app name as-is, no reformatting
+    return appName;
   }
 
   showSubmitModal() {
@@ -1089,37 +1108,6 @@ class ActivityReview {
       // Build notes with task name on top (if selected) followed by user notes
       let combinedNotes = '';
 
-      // Add task name if selected
-      if (this.blockTasks.has(index)) {
-        const taskGid = this.blockTasks.get(index);
-        console.log(`Block ${index} has task GID:`, taskGid);
-        // Find task name from asanaTasks
-        let taskName = '';
-        if (this.asanaTasks) {
-          // Search in tasks_by_project
-          for (const tasks of Object.values(this.asanaTasks.tasks_by_project || {})) {
-            const task = tasks.find(t => t.gid === taskGid);
-            if (task) {
-              taskName = task.name;
-              console.log(`Found task name:`, taskName);
-              break;
-            }
-          }
-          // Search in tasks_without_project if not found
-          if (!taskName && this.asanaTasks.tasks_without_project) {
-            const task = this.asanaTasks.tasks_without_project.find(t => t.gid === taskGid);
-            if (task) {
-              taskName = task.name;
-              console.log(`Found task name (no project):`, taskName);
-            }
-          }
-        }
-        if (taskName) {
-          combinedNotes = taskName;
-          console.log(`Setting combinedNotes to:`, combinedNotes);
-        }
-      }
-
       // Add user notes if available
       if (this.blockNotes.has(index)) {
         const userNotes = this.blockNotes.get(index);
@@ -1133,6 +1121,17 @@ class ActivityReview {
       // Set combined notes if any content exists
       if (combinedNotes) {
         block.notes = combinedNotes;
+      }
+
+      // Add task information if selected
+      if (this.blockTasks.has(index)) {
+        const taskId = this.blockTasks.get(index);
+        const task = this.asanaTasks.find(t => t.task_id === taskId);
+        if (task) {
+          block.task_id = task.task_id;
+          block.task_name = task.task_name;
+          block.project_name = task.project_name;
+        }
       }
 
       selectedBlocks.push(block);
@@ -1156,6 +1155,7 @@ class ActivityReview {
   showUI() {
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('errorState').style.display = 'none';
+    document.getElementById('viewToggleContainer').style.display = 'flex';
     document.getElementById('timelineContainer').style.display = 'block';
     document.getElementById('actionBar').style.display = 'flex';
   }

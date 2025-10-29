@@ -29,6 +29,11 @@ class SettingsManager {
       this.updateN8NStatus(e.target.checked);
     });
 
+    // Asana toggle
+    document.getElementById('asanaEnabled').addEventListener('change', (e) => {
+      this.updateAsanaStatus(e.target.checked);
+    });
+
     // Save button
     document.getElementById('saveSettingsBtn').addEventListener('click', () => this.saveSettings());
     
@@ -154,6 +159,13 @@ class SettingsManager {
     
     // Update status badge
     this.updateN8NStatus(n8nEnabled);
+
+    // Asana integration
+    const asanaEnabled = this.settings.integrations?.asana?.enabled || false;
+    document.getElementById('asanaEnabled').checked = asanaEnabled;
+    
+    // Update Asana status badge
+    this.updateAsanaStatus(asanaEnabled);
   }
 
   toggleWorkScheduleDetails(enabled) {
@@ -163,6 +175,17 @@ class SettingsManager {
 
   updateN8NStatus(enabled) {
     const badge = document.getElementById('n8nStatusBadge');
+    if (enabled) {
+      badge.textContent = 'Enabled';
+      badge.className = 'status-badge status-connected';
+    } else {
+      badge.textContent = 'Disabled';
+      badge.className = 'status-badge status-disabled';
+    }
+  }
+
+  updateAsanaStatus(enabled) {
+    const badge = document.getElementById('asanaStatusBadge');
     if (enabled) {
       badge.textContent = 'Enabled';
       badge.className = 'status-badge status-connected';
@@ -194,6 +217,16 @@ class SettingsManager {
         n8n: {
           enabled: document.getElementById('n8nEnabled').checked,
           webhook_url: document.getElementById('n8nWebhookUrl').value.trim()
+        },
+        asana: {
+          enabled: document.getElementById('asanaEnabled').checked,
+          personal_access_token: this.settings?.integrations?.asana?.personal_access_token || '',
+          cache: this.settings?.integrations?.asana?.cache || { user_gid: '' },
+          task_filters: this.settings?.integrations?.asana?.task_filters || {
+            match_task_names: [],
+            match_sections_containing: ['time-tracking'],
+            match_all_tasks: false
+          }
         }
       }
     };

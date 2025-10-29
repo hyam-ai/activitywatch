@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Activity Review – HY.AM STUDIOS</title>
+    <title>mainpage - Daily Activity Review</title>
     
     <!-- Preload logo images for theme switching -->
     <link rel="preload" href="/static/hyam-logo-light.png" as="image">
@@ -68,6 +68,12 @@
         <div id="errorState" class="error-state" style="display: none;">
             <p class="text-body">[ No activity data available ]</p>
             <p class="text-body error-message" id="errorMessage"></p>
+        </div>
+
+        <!-- View Toggle Buttons -->
+        <div class="view-toggle-container" style="display: none;" id="viewToggleContainer">
+            <button class="view-toggle-btn active" id="viewTimelineBtn">[ Timeline ]</button>
+            <button class="view-toggle-btn" id="viewSummaryBtn">[ Summary ]</button>
         </div>
 
         <!-- Timeline Container -->

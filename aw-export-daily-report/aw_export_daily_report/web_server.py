@@ -11,10 +11,12 @@ import sys
 import json
 import requests
 from dotenv import load_dotenv
+from collections import defaultdict
 
 from aw_export_daily_report.data_fetcher import ActivityDataFetcher
 from aw_export_daily_report.timeline_analyzer import TimelineAnalyzer
 from aw_export_daily_report.config import SettingsManager
+from aw_export_daily_report.asana_client import AsanaClient
 
 # Detect if running as PyInstaller bundle or in dev mode
 if getattr(sys, 'frozen', False):
@@ -217,164 +219,6 @@ def submit_activity():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/asana/tasks')
-def get_asana_tasks():
-    """
-    Get all incomplete Asana tasks assigned to the user (by email from settings)
-    
-    Returns:
-        JSON with tasks grouped by project
-    """
-    try:
-        # Load environment variables - handle both dev and PyInstaller bundle
-        if getattr(sys, 'frozen', False):
-            # Running as PyInstaller bundle
-            env_path = Path(sys._MEIPASS) / 'aw_export_daily_report' / '.env'
-        else:
-            # Running in dev mode
-            env_path = Path(__file__).parent.parent / '.env'
-
-        load_dotenv(env_path)
-        
-        ASANA_TOKEN = os.getenv('ASANA_PERSONAL_ACCESS_TOKEN')
-        BASE_URL = "https://app.asana.com/api/1.0"
-        
-        if not ASANA_TOKEN:
-            return jsonify({'error': 'ASANA_PERSONAL_ACCESS_TOKEN not found in .env file'}), 500
-        
-        headers = {
-            "Authorization": f"Bearer {ASANA_TOKEN}"
-        }
-        
-        # Load settings to get user email and cached GID
-        settings_manager = SettingsManager()
-        settings = settings_manager.load_settings()
-        user_email = settings.get('user', {}).get('email', '')
-        cached_gid = settings.get('user', {}).get('asana_gid')
-        
-        if not user_email:
-            return jsonify({'error': 'User email not configured in settings'}), 400
-        
-        # 1. Get workspace GID
-        response = requests.get(f"{BASE_URL}/workspaces", headers=headers)
-        workspaces = response.json()['data']
-        
-        if not workspaces:
-            return jsonify({'error': 'No workspaces found'}), 404
-        
-        workspace_gid = workspaces[0]['gid']
-        
-        # 2. Get or lookup user GID from email
-        user_gid = cached_gid
-        
-        # If no cached GID or email changed, lookup user by email
-        if not user_gid:
-            print(f"Looking up Asana user GID for email: {user_email}")
-            users_response = requests.get(
-                f"{BASE_URL}/workspaces/{workspace_gid}/users",
-                headers=headers,
-                params={
-                    'opt_fields': 'name,email'  # Request email field
-                }
-            )
-            
-            if users_response.status_code == 200:
-                workspace_users = users_response.json()['data']
-                # Find user by email
-                matching_user = next(
-                    (u for u in workspace_users if u.get('email', '').lower() == user_email.lower()),
-                    None
-                )
-                
-                if matching_user:
-                    user_gid = matching_user['gid']
-                    # Cache the GID for future requests
-                    settings_manager.set_user_asana_gid(user_gid)
-                    print(f"✓ Found and cached user GID: {user_gid}")
-                else:
-                    return jsonify({'error': f'No Asana user found with email: {user_email}'}), 404
-            else:
-                return jsonify({'error': f'Failed to fetch workspace users: {users_response.status_code}'}), 500
-        
-        # 3. Get all tasks assigned to this user with project details
-        response = requests.get(
-            f"{BASE_URL}/tasks",
-            headers=headers,
-            params={
-                'assignee': user_gid,  # Use GID instead of 'me'
-                'workspace': workspace_gid,
-                'opt_fields': 'name,completed,due_on,projects.name,memberships.project.name,memberships.section.name,num_subtasks',
-                'limit': 100
-            }
-        )
-        
-        if response.status_code != 200:
-            return jsonify({'error': f'Asana API request failed: {response.status_code}'}), 500
-        
-        tasks = response.json()['data']
-        
-        # Filter out completed tasks (client-side filtering)
-        tasks = [task for task in tasks if not task.get('completed', False)]
-        
-        # 3. Fetch subtasks for tasks that have them
-        all_tasks = []
-        for task in tasks:
-            all_tasks.append(task)
-            
-            num_subtasks = task.get('num_subtasks', 0)
-            if num_subtasks > 0:
-                subtasks_response = requests.get(
-                    f"{BASE_URL}/tasks/{task['gid']}/subtasks",
-                    headers=headers,
-                    params={
-                        'opt_fields': 'name,completed,due_on,projects.name,memberships.project.name,memberships.section.name'
-                    }
-                )
-                
-                if subtasks_response.status_code == 200:
-                    subtasks = subtasks_response.json()['data']
-                    incomplete_subtasks = [st for st in subtasks if not st.get('completed', False)]
-                    
-                    # Inherit parent's projects and memberships for subtasks without them
-                    for subtask in incomplete_subtasks:
-                        if not subtask.get('projects'):
-                            subtask['projects'] = task.get('projects', [])
-                        if not subtask.get('memberships'):
-                            subtask['memberships'] = task.get('memberships', [])
-                    
-                    all_tasks.extend(incomplete_subtasks)
-        
-        tasks = all_tasks
-        
-        # 4. Organize tasks by project
-        tasks_by_project = {}
-        tasks_without_project = []
-        
-        for task in tasks:
-            projects = task.get('projects', [])
-            
-            if not projects:
-                tasks_without_project.append(task)
-            else:
-                for project in projects:
-                    project_name = project.get('name', 'Unknown Project')
-                    if project_name not in tasks_by_project:
-                        tasks_by_project[project_name] = []
-                    tasks_by_project[project_name].append(task)
-        
-        # 5. Format response
-        return jsonify({
-            'tasks_by_project': tasks_by_project,
-            'tasks_without_project': tasks_without_project,
-            'total_tasks': len(tasks)
-        })
-    
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-
 @app.route('/api/settings', methods=['GET'])
 def get_settings():
     """
@@ -398,22 +242,18 @@ def save_settings():
         settings = request.json
         manager = SettingsManager()
         
-        # Check if email changed - invalidate cached Asana GID
+        # Check if email changed
         old_settings = manager.load_settings()
         old_email = old_settings.get('user', {}).get('email', '')
         new_email = settings.get('user', {}).get('email', '')
-        
-        if old_email != new_email:
-            # Email changed - clear cached Asana GID to force re-lookup
-            settings['user']['asana_gid'] = None
-            print(f"Email changed from '{old_email}' to '{new_email}' - clearing cached Asana GID")
+        email_changed = old_email != new_email
         
         success, errors = manager.save_settings(settings)
         
         if success:
             return jsonify({
                 'success': True,
-                'email_changed': old_email != new_email  # Signal to frontend
+                'email_changed': email_changed
             })
         else:
             return jsonify({
@@ -457,10 +297,210 @@ def get_timezones():
     return jsonify(timezones)
 
 
+@app.route('/api/asana/tasks', methods=['GET'])
+def get_asana_tasks():
+    """
+    Get Asana tasks for user by email
+    
+    Query params:
+        email: User email address (required)
+        refresh: Force cache refresh (optional, default: false)
+        
+    Returns:
+        JSON with tasks list or error
+    """
+    try:
+        # Get email from query params
+        email = request.args.get('email')
+        force_refresh = request.args.get('refresh', 'false').lower() == 'true'
+        
+        if not email:
+            return jsonify({
+                'success': False,
+                'error': 'Email parameter is required',
+                'tasks': [],
+                'cached': False
+            }), 400
+        
+        # Load settings
+        settings_manager = SettingsManager()
+        
+        # Check if Asana is enabled
+        if not settings_manager.is_asana_enabled():
+            return jsonify({
+                'success': False,
+                'error': 'Asana integration is not enabled in settings',
+                'tasks': [],
+                'cached': False
+            }), 400
+        
+        # Get Asana token
+        token = settings_manager.get_asana_token()
+        
+        if not token:
+            return jsonify({
+                'success': False,
+                'error': 'Asana token not configured in settings',
+                'tasks': [],
+                'cached': False
+            }), 400
+        
+        # Check cache first (unless force refresh)
+        if not force_refresh:
+            cached_tasks = settings_manager.get_cached_tasks(email, ttl_seconds=1800)  # 30 minutes
+            if cached_tasks is not None:
+                print(f"✓ Returning {len(cached_tasks)} cached tasks for {email}")
+                return jsonify({
+                    'success': True,
+                    'user_email': email,
+                    'tasks': cached_tasks,
+                    'cached': True,
+                    'error': None
+                })
+        
+        # Cache miss or force refresh - fetch from Asana API
+        print(f"⟳ Fetching fresh tasks from Asana API for {email}...")
+        
+        # Initialize Asana client
+        asana_client = AsanaClient(token)
+        
+        # Get task filters
+        filters = settings_manager.get_asana_filters()
+        
+        # Fetch tasks
+        result = asana_client.get_filtered_tasks(email, filters)
+        
+        # Cache user GID if successful
+        if result['success'] and result.get('user_gid'):
+            settings_manager.set_asana_user_gid(result['user_gid'])
+        
+        # Cache tasks if successful
+        if result['success'] and result.get('tasks'):
+            settings_manager.set_cached_tasks(email, result['tasks'])
+            print(f"✓ Cached {len(result['tasks'])} tasks for {email}")
+        
+        # Add cached flag to response
+        result['cached'] = False
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'tasks': [],
+            'cached': False
+        }), 500
+
+
 @app.route('/health')
 def health():
     """Health check endpoint"""
     return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
+
+
+
+def aggregate_by_duration(unified_data):
+    """
+    Aggregate activities grouped by app, sorted by duration
+    
+    Args:
+        unified_data: List of activity events with app, title, duration, afk fields
+        
+    Returns:
+        Dict with apps list: [{app, total_duration, activities: [{title, duration}]}]
+    """
+    MIN_ACTIVITY_SECONDS = 60  # Filter out activities shorter than 1 minute for summary display
+    AFK_THRESHOLD_SECONDS = 120  # Only exclude AFK periods >= 2 minutes (matches timeline_analyzer)
+    
+    # Filter active events only (matches timeline_analyzer logic)
+    active_events = [
+        event for event in unified_data
+        if not (event.get('afk', False) and float(event.get('duration', 0)) >= AFK_THRESHOLD_SECONDS)
+        and event.get('app', '') != 'loginwindow'
+        and float(event.get('duration', 0)) >= MIN_ACTIVITY_SECONDS
+    ]
+    
+    # Group by app, then aggregate activities within each app
+    apps_data = defaultdict(lambda: defaultdict(float))
+    
+    for event in active_events:
+        app = event.get('app', 'Unknown')
+        title = event.get('title', 'Unknown')
+        duration = float(event.get('duration', 0))
+        
+        apps_data[app][title] += duration
+    
+    # Structure data: calculate app totals and sort
+    apps_list = []
+    
+    for app, activities_dict in apps_data.items():
+        # Convert activities to list and sort by duration
+        activities = [
+            {'title': title, 'duration': duration}
+            for title, duration in activities_dict.items()
+        ]
+        activities.sort(key=lambda x: x['duration'], reverse=True)
+        
+        # Calculate total duration for this app
+        total_duration = sum(a['duration'] for a in activities)
+        
+        apps_list.append({
+            'app': app,
+            'total_duration': total_duration,
+            'activities': activities
+        })
+    
+    # Sort apps by total duration (descending)
+    apps_list.sort(key=lambda x: x['total_duration'], reverse=True)
+    
+    return apps_list
+
+
+@app.route('/api/summary/<date>')
+def get_summary(date):
+    """
+    Get activity summary grouped by app, sorted by duration
+    
+    Args:
+        date: YYYY-MM-DD format
+        
+    Returns:
+        JSON with apps and their activities sorted by duration descending
+    """
+    try:
+        # Parse date
+        target_date = datetime.strptime(date, '%Y-%m-%d')
+        
+        # Fetch data
+        fetcher = ActivityDataFetcher()
+        unified_data = fetcher.get_unified_daily_data(target_date)
+        
+        if not unified_data:
+            return jsonify({'error': 'No data found for date'}), 404
+        
+        # Aggregate and group by app
+        apps_data = aggregate_by_duration(unified_data)
+        
+        # Calculate total active time
+        total_duration = sum(app['total_duration'] for app in apps_data)
+        
+        return jsonify({
+            'date': date,
+            'apps': apps_data,
+            'total_active_time': total_duration
+        })
+        
+    except ValueError as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Invalid date format: {e}'}), 400
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 def run_server(host='0.0.0.0', port=9999, debug=False):

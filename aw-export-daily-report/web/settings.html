@@ -174,9 +174,17 @@
                     <div class="integration-header">
                         <div>
                             <h3 class="integration-title">Asana</h3>
-                            <p class="integration-desc">Task management integration (configured server-side)</p>
+                            <p class="integration-desc">Task management integration</p>
                         </div>
-                        <span class="status-badge status-info">Server Configured</span>
+                        <span class="status-badge status-disabled" id="asanaStatusBadge">Disabled</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="asanaEnabled" class="checkbox checkbox-md" />
+                            <span>Enable Asana integration</span>
+                        </label>
+                        <p class="form-hint">Tasks will be fetched based on your email address</p>
                     </div>
                 </div>
 

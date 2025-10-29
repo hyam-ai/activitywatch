@@ -143,8 +143,8 @@ class ActivityDataFetcher:
                 if overlap_start < overlap_end:
                     afk_duration += (overlap_end - overlap_start)
 
-        # Consider AFK if more than 50% of time was AFK
-        return afk_duration > window_event.duration / 2
+        # Consider AFK if more than 75% of time was AFK
+        return afk_duration > window_event.duration * 0.75
 
     def get_unified_daily_data(self, date: datetime = None) -> List[Dict[str, Any]]:
         """
