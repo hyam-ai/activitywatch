@@ -1,6 +1,5 @@
 build
 dist
-docs
 other
 old
 
@@ -30,17 +29,28 @@ __pycache__
 # Backup files
 *.bak
 
-# Test directories
-aw-export-daily-report/Test/
-
 # MCP/Tool directories
 .playwright-mcp/
-.serena/
 aw-export-daily-report/analysis/*.json
 
 # Custom documentation (not part of upstream)
-CLAUDE.md
 CUSTOM_MODIFICATIONS.md
-DEPLOYMENT.md
 HYAM_DESIGN_SYSTEM_COMPLETE.md
 activityWatch-compliance.md
+
+# Environment files (CRITICAL - contains secrets)
+**/.env
+.env.local
+.env.*.local
+
+# User-specific settings
+aw-export-daily-report/config/settings.json
+
+# Personal/test content
+personal docs/
+aw-export-daily-report/Test/
+aw-export-daily-report/analysis/
+
+# Tool configurations
+gptme.toml
+.tool-versions
